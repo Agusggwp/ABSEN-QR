@@ -13,6 +13,7 @@ class Student extends Model
     use SoftDeletes;
 
     protected $fillable = [
+        'user_id',
         'nis',
         'nisn',
         'name',
@@ -28,6 +29,11 @@ class Student extends Model
         return [
             'is_active' => 'boolean',
         ];
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     public function schoolClass(): BelongsTo
