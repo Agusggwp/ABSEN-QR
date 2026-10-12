@@ -1,4 +1,4 @@
-export type UserRole = 'super_admin' | 'admin_sekolah' | 'petugas_absensi' | 'guru_wali' | 'kepala_sekolah';
+export type UserRole = 'super_admin' | 'admin_sekolah' | 'petugas_absensi' | 'guru_wali' | 'kepala_sekolah' | 'murid';
 
 export interface User {
     id: number;
@@ -175,5 +175,6 @@ export type PageProps<
     app_settings: {
         school_name: string;
         timezone: string;
+        logo_path?: string | null;
     };
 };

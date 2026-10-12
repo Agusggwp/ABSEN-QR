@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Pagination from '@/Components/Pagination';
 import StatusBadge from '@/Components/StatusBadge';
@@ -52,13 +52,32 @@ export default function ReportsIndex({
     const [classId, setClassId] = useState(filters.class_id || '');
     const [status, setStatus] = useState(filters.status || 'all');
     const [reportType, setReportType] = useState(filters.type || 'daily');
+    const isFirstRender = useRef(true);
+
+    // Live filter without progress bar
+    useEffect(() => {
+        if (isFirstRender.current) {
+            isFirstRender.current = false;
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            router.get(
+                '/reports',
+                { start_date: startDate, end_date: endDate, class_id: classId, status, type: reportType },
+                { preserveState: true, preserveScroll: true, replace: true, showProgress: false }
+            );
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [startDate, endDate, classId, status, reportType]);
 
     const handleFilterSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         router.get(
             '/reports',
             { start_date: startDate, end_date: endDate, class_id: classId, status, type: reportType },
-            { preserveState: true, replace: true }
+            { preserveState: true, preserveScroll: true, replace: true, showProgress: false }
         );
     };
 
@@ -66,15 +85,15 @@ export default function ReportsIndex({
         <AuthenticatedLayout title="Laporan & Rekapitulasi Absensi">
             <Head title="Laporan Absensi" />
 
-            <div className="space-y-6">
+            <div className="space-y-5">
                 {/* Header Action Bar */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-white rounded-xl border border-gray-200 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-white rounded-lg border border-slate-200 shadow-xs">
                     <div>
-                        <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                            <FileSpreadsheet className="w-5 h-5 text-[#14433b]" />
-                            <span>Pusat Laporan & Rekapitulasi Kehadiran Siswa</span>
+                        <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                            <FileSpreadsheet className="w-4 h-4 text-[#14433b]" />
+                            <span>Pusat Laporan & Rekapitulasi Presensi Siswa</span>
                         </h2>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-slate-500 mt-0.5">
                             Unduh laporan resmi sekolah berstandar Dapodik dalam format Excel dan PDF
                         </p>
                     </div>
@@ -84,9 +103,9 @@ export default function ReportsIndex({
                             href={`/reports/export-excel?start_date=${startDate}&end_date=${endDate}${classId ? `&class_id=${classId}` : ''}${status !== 'all' ? `&status=${status}` : ''}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-all shadow-sm"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-colors shadow-xs"
                         >
-                            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
                             <span>Unduh Excel (.xlsx)</span>
                         </a>
 
@@ -94,43 +113,43 @@ export default function ReportsIndex({
                             href={`/reports/export-pdf?start_date=${startDate}&end_date=${endDate}${classId ? `&class_id=${classId}` : ''}${status !== 'all' ? `&status=${status}` : ''}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-[#14433b] text-white hover:bg-[#1b554b] transition-all shadow-sm active:scale-95"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-[#14433b] text-white hover:bg-[#1a554a] transition-colors shadow-xs"
                         >
-                            <FileText className="w-4 h-4 text-[#21c9a4]" />
+                            <FileText className="w-3.5 h-3.5 text-[#21c9a4]" />
                             <span>Cetak PDF Resmi</span>
                         </a>
                     </div>
                 </div>
 
                 {/* Filter Bar */}
-                <div className="p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
-                    <form onSubmit={handleFilterSubmit} className="grid grid-cols-1 sm:grid-cols-12 gap-3 text-xs">
+                <div className="p-3.5 bg-white rounded-lg border border-slate-200 shadow-xs">
+                    <form onSubmit={handleFilterSubmit} className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 text-xs">
                         <div className="sm:col-span-3">
-                            <label className="block text-gray-500 font-semibold mb-1">Tanggal Mulai:</label>
+                            <label className="block text-slate-600 font-medium mb-1">Tanggal Mulai:</label>
                             <input
                                 type="date"
                                 value={startDate}
                                 onChange={(e) => setStartDate(e.target.value)}
-                                className="w-full py-2 px-3 text-xs rounded-lg border-gray-300 focus:ring-[#21c9a4] focus:border-[#21c9a4]"
+                                className="w-full py-1.5 px-3 text-xs rounded-md border-slate-300 focus:ring-[#14433b] focus:border-[#14433b]"
                             />
                         </div>
 
                         <div className="sm:col-span-3">
-                            <label className="block text-gray-500 font-semibold mb-1">Tanggal Selesai:</label>
+                            <label className="block text-slate-600 font-medium mb-1">Tanggal Selesai:</label>
                             <input
                                 type="date"
                                 value={endDate}
                                 onChange={(e) => setEndDate(e.target.value)}
-                                className="w-full py-2 px-3 text-xs rounded-lg border-gray-300 focus:ring-[#21c9a4] focus:border-[#21c9a4]"
+                                className="w-full py-1.5 px-3 text-xs rounded-md border-slate-300 focus:ring-[#14433b] focus:border-[#14433b]"
                             />
                         </div>
 
                         <div className="sm:col-span-3">
-                            <label className="block text-gray-500 font-semibold mb-1">Filter Kelas:</label>
+                            <label className="block text-slate-600 font-medium mb-1">Filter Kelas:</label>
                             <select
                                 value={classId}
                                 onChange={(e) => setClassId(e.target.value)}
-                                className="w-full py-2 px-3 text-xs rounded-lg border-gray-300 focus:ring-[#21c9a4] focus:border-[#21c9a4]"
+                                className="w-full py-1.5 pl-3 pr-8 text-xs rounded-md border-slate-300 focus:ring-[#14433b] focus:border-[#14433b] bg-white"
                             >
                                 <option value="">Seluruh Kelas</option>
                                 {classes.map((cls) => (
@@ -140,11 +159,11 @@ export default function ReportsIndex({
                         </div>
 
                         <div className="sm:col-span-2">
-                            <label className="block text-gray-500 font-semibold mb-1">Status Kehadiran:</label>
+                            <label className="block text-slate-600 font-medium mb-1">Status Kehadiran:</label>
                             <select
                                 value={status}
                                 onChange={(e) => setStatus(e.target.value)}
-                                className="w-full py-2 px-3 text-xs rounded-lg border-gray-300 focus:ring-[#21c9a4] focus:border-[#21c9a4]"
+                                className="w-full py-1.5 pl-3 pr-8 text-xs rounded-md border-slate-300 focus:ring-[#14433b] focus:border-[#14433b] bg-white"
                             >
                                 <option value="all">Semua Status</option>
                                 <option value="hadir">Hadir Tepat</option>
@@ -158,10 +177,11 @@ export default function ReportsIndex({
                         <div className="sm:col-span-1 flex items-end">
                             <button
                                 type="submit"
-                                className="w-full py-2 px-3 rounded-lg bg-[#14433b] text-white font-bold hover:bg-[#1b554b] transition-colors flex items-center justify-center shadow-sm"
+                                aria-label="Terapkan Filter"
+                                className="w-full py-1.5 px-3 rounded-md bg-[#14433b] text-white hover:bg-[#1a554a] transition-colors flex items-center justify-center shadow-xs"
                                 title="Terapkan Filter"
                             >
-                                <Filter className="w-4 h-4 text-[#21c9a4]" />
+                                <Filter className="w-3.5 h-3.5 text-[#21c9a4]" />
                             </button>
                         </div>
                     </form>
@@ -169,73 +189,73 @@ export default function ReportsIndex({
 
                 {/* Summary Statistics Boxes */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                    <div className="p-4 bg-white rounded-xl border border-gray-200">
-                        <span className="text-[11px] text-gray-500 font-bold uppercase">Total Rekaman</span>
-                        <p className="mt-1 text-2xl font-extrabold text-gray-900">{stats.total}</p>
+                    <div className="p-3 bg-white rounded-lg border border-slate-200 shadow-xs">
+                        <span className="text-[11px] text-slate-500 font-medium">Total Rekaman</span>
+                        <p className="mt-1 text-xl font-bold text-slate-900">{stats.total}</p>
                     </div>
-                    <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200">
-                        <span className="text-[11px] text-emerald-700 font-bold uppercase">Hadir Tepat</span>
-                        <p className="mt-1 text-2xl font-extrabold text-emerald-800">{stats.hadir}</p>
+                    <div className="p-3 bg-white rounded-lg border border-slate-200 shadow-xs">
+                        <span className="text-[11px] text-emerald-700 font-medium">Hadir Tepat</span>
+                        <p className="mt-1 text-xl font-bold text-emerald-700">{stats.hadir}</p>
                     </div>
-                    <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
-                        <span className="text-[11px] text-amber-700 font-bold uppercase">Terlambat</span>
-                        <p className="mt-1 text-2xl font-extrabold text-amber-800">{stats.terlambat}</p>
+                    <div className="p-3 bg-white rounded-lg border border-slate-200 shadow-xs">
+                        <span className="text-[11px] text-amber-700 font-medium">Terlambat</span>
+                        <p className="mt-1 text-xl font-bold text-amber-700">{stats.terlambat}</p>
                     </div>
-                    <div className="p-4 bg-sky-50 rounded-xl border border-sky-200">
-                        <span className="text-[11px] text-sky-700 font-bold uppercase">Izin</span>
-                        <p className="mt-1 text-2xl font-extrabold text-sky-800">{stats.izin}</p>
+                    <div className="p-3 bg-white rounded-lg border border-slate-200 shadow-xs">
+                        <span className="text-[11px] text-blue-700 font-medium">Izin</span>
+                        <p className="mt-1 text-xl font-bold text-blue-700">{stats.izin}</p>
                     </div>
-                    <div className="p-4 bg-purple-50 rounded-xl border border-purple-200">
-                        <span className="text-[11px] text-purple-700 font-bold uppercase">Sakit</span>
-                        <p className="mt-1 text-2xl font-extrabold text-purple-800">{stats.sakit}</p>
+                    <div className="p-3 bg-white rounded-lg border border-slate-200 shadow-xs">
+                        <span className="text-[11px] text-indigo-700 font-medium">Sakit</span>
+                        <p className="mt-1 text-xl font-bold text-indigo-700">{stats.sakit}</p>
                     </div>
-                    <div className="p-4 bg-rose-50 rounded-xl border border-rose-200">
-                        <span className="text-[11px] text-rose-700 font-bold uppercase">Alpa</span>
-                        <p className="mt-1 text-2xl font-extrabold text-rose-800">{stats.alpa}</p>
+                    <div className="p-3 bg-white rounded-lg border border-slate-200 shadow-xs">
+                        <span className="text-[11px] text-rose-700 font-medium">Alpa</span>
+                        <p className="mt-1 text-xl font-bold text-rose-700">{stats.alpa}</p>
                     </div>
                 </div>
 
                 {/* Report Table */}
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="bg-white rounded-lg border border-slate-200 shadow-xs overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs">
                             <thead>
-                                <tr className="border-b border-gray-200 text-gray-500 font-semibold bg-gray-50/70">
-                                    <th className="py-3 px-4">Tanggal</th>
-                                    <th className="py-3 px-4">NIS</th>
-                                    <th className="py-3 px-4">Nama Siswa</th>
-                                    <th className="py-3 px-4">Kelas</th>
-                                    <th className="py-3 px-4">Jam Masuk</th>
-                                    <th className="py-3 px-4 text-center">Status</th>
-                                    <th className="py-3 px-4">Petugas Verifikator</th>
-                                    <th className="py-3 px-4">Keterangan</th>
+                                <tr className="border-b border-slate-200 text-slate-600 font-semibold bg-slate-50/75">
+                                    <th className="py-2.5 px-3.5">Tanggal</th>
+                                    <th className="py-2.5 px-3.5">NIS</th>
+                                    <th className="py-2.5 px-3.5">Nama Siswa</th>
+                                    <th className="py-2.5 px-3.5">Kelas</th>
+                                    <th className="py-2.5 px-3.5">Jam Masuk</th>
+                                    <th className="py-2.5 px-3.5 text-center">Status</th>
+                                    <th className="py-2.5 px-3.5">Petugas Verifikator</th>
+                                    <th className="py-2.5 px-3.5">Keterangan</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
+                            <tbody className="divide-y divide-slate-100 text-slate-700">
                                 {attendances.data.length > 0 ? (
                                     attendances.data.map((att) => (
-                                        <tr key={att.id} className="hover:bg-gray-50/80 transition-colors">
-                                            <td className="py-3 px-4 font-mono font-medium text-gray-900">{att.date}</td>
-                                            <td className="py-3 px-4 font-mono text-gray-600">{att.student?.nis}</td>
-                                            <td className="py-3 px-4 font-bold text-gray-900">{att.student?.name}</td>
-                                            <td className="py-3 px-4 text-gray-700 font-semibold">{att.school_class?.name ?? '-'}</td>
-                                            <td className="py-3 px-4 font-mono text-gray-700">
+                                        <tr key={att.id} className="hover:bg-slate-50/60 transition-colors">
+                                            <td className="py-2.5 px-3.5 font-mono font-medium text-slate-900">{att.date}</td>
+                                            <td className="py-2.5 px-3.5 font-mono text-slate-600">{att.student?.nis}</td>
+                                            <td className="py-2.5 px-3.5 font-medium text-slate-900">{att.student?.name}</td>
+                                            <td className="py-2.5 px-3.5 text-slate-700">{att.school_class?.name ?? '-'}</td>
+                                            <td className="py-2.5 px-3.5 font-mono text-slate-700">
                                                 {att.scanned_at ? new Date(att.scanned_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-'}
                                             </td>
-                                            <td className="py-3 px-4 text-center">
+                                            <td className="py-2.5 px-3.5 text-center">
                                                 <StatusBadge status={att.status} size="sm" />
                                             </td>
-                                            <td className="py-3 px-4 text-gray-600 font-medium">
+                                            <td className="py-2.5 px-3.5 text-slate-600">
                                                 {att.verified_by_user?.name ?? 'Petugas'}
                                             </td>
-                                            <td className="py-3 px-4 text-gray-500 max-w-xs truncate">
+                                            <td className="py-2.5 px-3.5 text-slate-500 max-w-xs truncate">
                                                 {att.notes || '-'}
                                             </td>
                                         </tr>
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan={8} className="py-12 text-center text-gray-400">
+                                        <td colSpan={8} className="py-12 text-center text-slate-400">
                                             Tidak ada data rekaman absensi untuk rentang tanggal ini.
                                         </td>
                                     </tr>
@@ -244,7 +264,7 @@ export default function ReportsIndex({
                         </table>
                     </div>
 
-                    <div className="px-4 border-t border-gray-100">
+                    <div className="px-4 border-t border-slate-100">
                         <Pagination links={attendances.links} />
                     </div>
                 </div>

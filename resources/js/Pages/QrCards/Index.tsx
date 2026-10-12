@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Pagination from '@/Components/Pagination';
 import StatusBadge from '@/Components/StatusBadge';
@@ -49,6 +49,25 @@ export default function QrCardsIndex({ cards, classes, filters }: QrCardsIndexPr
     const [search, setSearch] = useState(filters.search || '');
     const [classId, setClassId] = useState(filters.class_id || '');
     const [status, setStatus] = useState(filters.status || 'active');
+    const isFirstRender = useRef(true);
+
+    // Live debounced filter without loading bar
+    useEffect(() => {
+        if (isFirstRender.current) {
+            isFirstRender.current = false;
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            router.get(
+                '/qr-cards',
+                { search, class_id: classId, status },
+                { preserveState: true, preserveScroll: true, replace: true, showProgress: false }
+            );
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [search, classId, status]);
 
     // Revoke Modal state
     const [revokeModalOpen, setRevokeModalOpen] = useState(false);
@@ -57,7 +76,11 @@ export default function QrCardsIndex({ cards, classes, filters }: QrCardsIndexPr
 
     const handleFilterSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        router.get('/qr-cards', { search, class_id: classId, status }, { preserveState: true, replace: true });
+        router.get(
+            '/qr-cards',
+            { search, class_id: classId, status },
+            { preserveState: true, preserveScroll: true, replace: true, showProgress: false }
+        );
     };
 
     const handleRegenerate = (studentId: number, studentName: string) => {
@@ -128,7 +151,7 @@ export default function QrCardsIndex({ cards, classes, filters }: QrCardsIndexPr
                             <select
                                 value={classId}
                                 onChange={(e) => setClassId(e.target.value)}
-                                className="w-full py-2 px-3 text-xs rounded-lg border-gray-300 focus:ring-[#21c9a4] focus:border-[#21c9a4]"
+                                className="w-full py-2 pl-3 pr-8 text-xs rounded-lg border-gray-300 focus:ring-[#21c9a4] focus:border-[#21c9a4] bg-white"
                             >
                                 <option value="">Semua Kelas</option>
                                 {classes.map((cls) => (
@@ -141,7 +164,7 @@ export default function QrCardsIndex({ cards, classes, filters }: QrCardsIndexPr
                             <select
                                 value={status}
                                 onChange={(e) => setStatus(e.target.value)}
-                                className="w-full py-2 px-3 text-xs rounded-lg border-gray-300 focus:ring-[#21c9a4] focus:border-[#21c9a4]"
+                                className="w-full py-2 pl-3 pr-8 text-xs rounded-lg border-gray-300 focus:ring-[#21c9a4] focus:border-[#21c9a4] bg-white"
                             >
                                 <option value="active">Kartu Aktif</option>
                                 <option value="revoked">Dicabut</option>

@@ -20,15 +20,30 @@ use App\Http\Controllers\SchoolSettingController;
 use App\Http\Controllers\VerificationDeviceController;
 use App\Http\Controllers\EzvizCctvController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\StudentAccountController;
+use App\Http\Controllers\Portal\StudentPortalController;
+use App\Http\Controllers\DevModeController;
 use Illuminate\Support\Facades\Route;
 
 // Redirect Home to Dashboard or Login
 Route::get('/', function () {
-    return auth()->check() ? redirect()->route('dashboard') : redirect()->route('login');
+    if (!auth()->check()) {
+        return redirect()->route('login');
+    }
+    return auth()->user()->isMurid() ? redirect()->route('portal.dashboard') : redirect()->route('dashboard');
 });
 
 Route::middleware(['auth'])->group(function () {
-    // 1. Dashboard (All authenticated roles)
+    // 0. Portal Murid (Khusus Murid atau Super Admin)
+    Route::middleware(['role:murid'])->prefix('portal')->name('portal.')->group(function () {
+        Route::get('/dashboard', [StudentPortalController::class, 'dashboard'])->name('dashboard');
+        Route::get('/qr-code', [StudentPortalController::class, 'qrCode'])->name('qr-code');
+        Route::get('/attendance-history', [StudentPortalController::class, 'attendanceHistory'])->name('attendance-history');
+        Route::put('/password', [StudentPortalController::class, 'updatePassword'])->name('password.update');
+        Route::post('/photo', [StudentPortalController::class, 'updatePhoto'])->name('photo.update');
+    });
+
+    // 1. Dashboard (All authenticated roles except Murid)
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // 2. Profile
@@ -39,13 +54,24 @@ Route::middleware(['auth'])->group(function () {
     // 3. Scanner QR Terminal (Petugas, Admin Sekolah, Super Admin)
     Route::middleware(['role:super_admin,admin_sekolah,petugas_absensi'])->group(function () {
         Route::get('/scanner', [AttendanceScannerController::class, 'index'])->name('scanner.index');
-        Route::post('/scanner/pre-scan', [AttendanceScannerController::class, 'preScan'])->middleware('throttle:60,1')->name('scanner.pre-scan');
-        Route::post('/scanner/confirm', [AttendanceScannerController::class, 'confirm'])->middleware('throttle:60,1')->name('scanner.confirm');
+        Route::post('/scanner/pre-scan', [AttendanceScannerController::class, 'preScan'])->name('scanner.pre-scan');
+        Route::post('/scanner/confirm', [AttendanceScannerController::class, 'confirm'])->name('scanner.confirm');
         Route::post('/scanner/reject', [AttendanceScannerController::class, 'reject'])->name('scanner.reject');
+
+        // Mode Pengembang (Dev Mode APIs)
+        Route::post('/scanner/dev/toggle-session', [AttendanceScannerController::class, 'devToggleSession'])->name('scanner.dev.toggle-session');
+        Route::post('/scanner/dev/reset-today', [AttendanceScannerController::class, 'devResetToday'])->name('scanner.dev.reset-today');
+        Route::post('/scanner/dev/burst-scan', [AttendanceScannerController::class, 'devBurstScan'])->name('scanner.dev.burst-scan');
     });
 
     // 4. Data Siswa & Impor (Admin Sekolah, Super Admin)
     Route::middleware(['role:super_admin,admin_sekolah'])->group(function () {
+        Route::get('/students/accounts', [StudentAccountController::class, 'index'])->name('students.accounts');
+        Route::post('/students/{student}/account', [StudentAccountController::class, 'createSingle'])->name('students.account.create');
+        Route::post('/students/accounts/bulk-create', [StudentAccountController::class, 'bulkCreate'])->name('students.accounts.bulk-create');
+        Route::post('/students/{student}/account/reset-password', [StudentAccountController::class, 'resetPassword'])->name('students.account.reset-password');
+        Route::post('/students/{student}/account/toggle-status', [StudentAccountController::class, 'toggleStatus'])->name('students.account.toggle-status');
+
         Route::get('/students/import', [StudentImportController::class, 'index'])->name('students.import');
         Route::get('/students/import/template', [StudentImportController::class, 'downloadTemplate'])->name('students.import.template');
         Route::post('/students/import/preview', [StudentImportController::class, 'preview'])->name('students.import.preview');
@@ -88,7 +114,7 @@ Route::middleware(['auth'])->group(function () {
 
         // Pengaturan Sekolah
         Route::get('/settings', [SchoolSettingController::class, 'index'])->name('settings.index');
-        Route::put('/settings', [SchoolSettingController::class, 'update'])->name('settings.update');
+        Route::match(['put', 'post'], '/settings', [SchoolSettingController::class, 'update'])->name('settings.update');
 
         // Integrasi CCTV
         Route::get('/cctv', [EzvizCctvController::class, 'index'])->name('cctv.index');
@@ -107,6 +133,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/classroom', [ClassroomConfirmationController::class, 'store'])->name('classroom.store');
 
         // Izin dan Sakit
+        Route::get('/exceptions/students/search', [AttendanceExceptionController::class, 'searchStudents'])->name('exceptions.students.search');
         Route::get('/exceptions', [AttendanceExceptionController::class, 'index'])->name('exceptions.index');
         Route::post('/exceptions', [AttendanceExceptionController::class, 'store'])->name('exceptions.store');
         Route::delete('/exceptions/{exception}', [AttendanceExceptionController::class, 'destroy'])->name('exceptions.destroy');
@@ -133,6 +160,18 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['role:super_admin'])->group(function () {
         Route::resource('users', UserManagementController::class)->except(['create', 'edit', 'show']);
         Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');
+
+        // 9. Developer Tools Center & Mode Dev (Khusus Super Admin)
+        Route::prefix('dev-mode')->name('dev-mode.')->group(function () {
+            Route::get('/', [DevModeController::class, 'index'])->name('index');
+            Route::post('/toggle-session', [DevModeController::class, 'toggleSession'])->name('toggle-session');
+            Route::post('/simulate-scan', [DevModeController::class, 'simulateScan'])->name('simulate-scan');
+            Route::post('/burst-scan', [DevModeController::class, 'burstScan'])->name('burst-scan');
+            Route::post('/generate-history', [DevModeController::class, 'generateHistory'])->name('generate-history');
+            Route::post('/reset-today', [DevModeController::class, 'resetToday'])->name('reset-today');
+            Route::post('/reset-dev-data', [DevModeController::class, 'resetDevData'])->name('reset-dev-data');
+            Route::post('/inspect-token', [DevModeController::class, 'inspectToken'])->name('inspect-token');
+        });
     });
 });
 

@@ -232,11 +232,15 @@ class ExcelImportExportService
                 StudentQrCode::create([
                     'student_id' => $student->id,
                     'qr_token_hash' => $tokenHash,
+                    'qr_token_encrypted' => \Illuminate\Support\Facades\Crypt::encryptString($rawSecret),
                     'raw_token_masked' => $masked,
                     'card_number' => $cardNumber,
                     'status' => 'active',
                     'issued_at' => now(),
                 ]);
+
+                // Buat akun login murid otomatis
+                app(\App\Services\StudentAccountService::class)->createAccountForStudent($student);
 
                 // Buat riwayat keanggotaan kelas
                 ClassMembership::create([

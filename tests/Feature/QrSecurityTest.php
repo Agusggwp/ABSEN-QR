@@ -106,4 +106,59 @@ class QrSecurityTest extends TestCase
         $qrCode->refresh();
         $this->assertEquals('revoked', $qrCode->status);
     }
+
+    public function test_regenerating_card_avoids_duplicate_card_number()
+    {
+        $student = Student::create([
+            'nis' => '20261004',
+            'name' => 'Dewi Lestari',
+            'gender' => 'P',
+            'is_active' => true,
+        ]);
+
+        // First card issuance: KARTU-0000X
+        $firstResult = $this->qrService->generateTokenForStudent($student);
+        $firstCard = $firstResult['qr_code'];
+        $expectedBaseNumber = 'KARTU-' . str_pad((string) $student->id, 5, '0', STR_PAD_LEFT);
+        $this->assertEquals($expectedBaseNumber, $firstCard->card_number);
+
+        // Second card issuance: should safely increment to -V2 and NOT crash with duplicate key
+        $secondResult = $this->qrService->generateTokenForStudent($student);
+        $secondCard = $secondResult['qr_code'];
+        $this->assertEquals($expectedBaseNumber . '-V2', $secondCard->card_number);
+        $this->assertEquals('active', $secondCard->status);
+
+        $firstCard->refresh();
+        $this->assertEquals('replaced', $firstCard->status);
+    }
+
+    public function test_get_active_token_encrypts_legacy_card_in_place_without_duplicate_error()
+    {
+        $student = Student::create([
+            'nis' => '20261005',
+            'name' => 'Fajar Nugraha',
+            'gender' => 'L',
+            'is_active' => true,
+        ]);
+
+        $cardNumber = 'KARTU-' . str_pad((string) $student->id, 5, '0', STR_PAD_LEFT);
+
+        // Create legacy card without qr_token_encrypted
+        $legacyCard = StudentQrCode::create([
+            'student_id' => $student->id,
+            'qr_token_hash' => hash('sha256', 'LEGACY-OLD-SECRET'),
+            'qr_token_encrypted' => null,
+            'raw_token_masked' => 'LEGACY****',
+            'card_number' => $cardNumber,
+            'status' => 'active',
+            'issued_at' => now(),
+        ]);
+
+        $activeToken = $this->qrService->getActiveTokenForStudent($student);
+
+        $this->assertNotEmpty($activeToken['raw_secret_token']);
+        $this->assertEquals($cardNumber, $activeToken['qr_code']->card_number);
+        $this->assertNotNull($activeToken['qr_code']->qr_token_encrypted);
+        $this->assertEquals($legacyCard->id, $activeToken['qr_code']->id);
+    }
 }

@@ -15,6 +15,7 @@ class PdfReportService
     public function generateSingleStudentCard(Student $student, string $rawSecretToken): Response
     {
         $schoolName = SchoolSetting::get('school_name', 'SMA ARTDEVATA DENPASAR');
+        $logoPath = SchoolSetting::get('logo_path', null);
         $qrCode = $student->activeQrCode;
         $cardNumber = $qrCode?->card_number ?? ('KARTU-' . str_pad((string) $student->id, 5, '0', STR_PAD_LEFT));
 
@@ -23,6 +24,7 @@ class PdfReportService
             'qrToken' => $rawSecretToken,
             'cardNumber' => $cardNumber,
             'schoolName' => $schoolName,
+            'logoPath' => $logoPath,
         ])->setPaper([0, 0, 242.65, 153.01], 'landscape'); // 85.6mm x 53.98mm in points
 
         return $pdf->download("kartu_absen_{$student->nis}_{$student->name}.pdf");
@@ -34,10 +36,12 @@ class PdfReportService
     public function generateBulkStudentCards(array $cardsData): Response
     {
         $schoolName = SchoolSetting::get('school_name', 'SMA ARTDEVATA DENPASAR');
+        $logoPath = SchoolSetting::get('logo_path', null);
 
         $pdf = Pdf::loadView('pdf.bulk_student_cards', [
             'cards' => $cardsData,
             'schoolName' => $schoolName,
+            'logoPath' => $logoPath,
         ])->setPaper('a4', 'portrait');
 
         return $pdf->download("cetak_massal_kartu_siswa_artdevata.pdf");

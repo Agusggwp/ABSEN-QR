@@ -17,6 +17,12 @@ import {
     RefreshCw,
     Send,
     UserX,
+    Terminal,
+    Zap,
+    Trash2,
+    Dice5,
+    Unlock,
+    Lock,
 } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 
@@ -47,6 +53,15 @@ interface ScannerProps {
         time: string;
         officer_name: string;
     }>;
+    dev_students?: Array<{
+        id: number;
+        name: string;
+        nis: string;
+        class_name: string;
+        photo_path?: string | null;
+        token: string;
+    }>;
+    is_super_admin?: boolean;
     server_clock: string;
     server_date: string;
     attendance_settings?: any;
@@ -64,10 +79,12 @@ interface StudentIdentity {
 }
 
 export default function ScannerTerminal({
-    session,
+    session: initialSession,
     devices,
     default_device_id,
     recent_scans: initialRecentScans,
+    dev_students = [],
+    is_super_admin = false,
     server_clock,
     server_date,
     attendance_settings,
@@ -78,6 +95,48 @@ export default function ScannerTerminal({
     const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
     const [manualToken, setManualToken] = useState<string>('');
     const [recentScans, setRecentScans] = useState(initialRecentScans);
+    const [currentSession, setCurrentSession] = useState(initialSession);
+
+    // Realtime Scanner Clock (sinkron dengan Topbar)
+    const [scannerClock, setScannerClock] = useState<string>(() => {
+        const now = new Date();
+        return now.toLocaleTimeString('id-ID', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false,
+        });
+    });
+
+    useEffect(() => {
+        const updateClock = () => {
+            const now = new Date();
+            setScannerClock(
+                now.toLocaleTimeString('id-ID', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false,
+                })
+            );
+        };
+        updateClock();
+        const interval = setInterval(updateClock, 1000);
+        return () => clearInterval(interval);
+    }, []);
+
+    // Dev Mode States
+    const [isDevMode, setIsDevMode] = useState<boolean>(() => {
+        return localStorage.getItem('artdevata_dev_mode') === 'true';
+    });
+    const [devSelectedStudentId, setDevSelectedStudentId] = useState<number>(0);
+    const [isBursting, setIsBursting] = useState<boolean>(false);
+
+    const toggleDevMode = () => {
+        const nextVal = !isDevMode;
+        setIsDevMode(nextVal);
+        localStorage.setItem('artdevata_dev_mode', String(nextVal));
+    };
 
     // Active verification student data
     const [verifiedStudent, setVerifiedStudent] = useState<StudentIdentity | null>(null);
@@ -211,7 +270,8 @@ export default function ScannerTerminal({
             const response = await axios.post('/scanner/pre-scan', {
                 qr_token: qrToken,
                 device_id: selectedDevice,
-                session_id: session?.id,
+                session_id: currentSession?.id,
+                dev_mode: isDevMode,
             });
 
             const data = response.data;
@@ -221,7 +281,7 @@ export default function ScannerTerminal({
                 setVerifiedStudent(data.student);
                 setVerificationDetails(data);
                 setPhase('verifying');
-                setStatusMessage('Token VALID. Cocokkan wajah siswa fisik dengan foto resmi di bawah!');
+                setStatusMessage(data.message || 'Token VALID. Cocokkan wajah siswa fisik dengan foto resmi di bawah!');
             } else if (data.status === 'duplicate') {
                 playSound('alert');
                 setVerifiedStudent(data.student);
@@ -243,16 +303,17 @@ export default function ScannerTerminal({
 
     // Tahap 2: Petugas Mengonfirmasi Wajah Cocok (Absensi Dicatat)
     const handleConfirmAttendance = async () => {
-        if (!verifiedStudent || !session) return;
+        if (!verifiedStudent || !currentSession) return;
 
         setIsSubmitting(true);
         try {
             const response = await axios.post('/scanner/confirm', {
                 student_id: verifiedStudent.id,
-                session_id: session.id,
+                session_id: currentSession.id,
                 device_id: selectedDevice,
                 qr_code_id: verificationDetails?.qr_code_id,
                 status: verificationDetails?.suggested_status || 'hadir',
+                dev_mode: isDevMode,
             });
 
             if (response.data.success) {
@@ -269,9 +330,9 @@ export default function ScannerTerminal({
                     class_name: verifiedStudent.class_name,
                     status: verificationDetails?.suggested_status || 'hadir',
                     time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-                    officer_name: 'Saya (Petugas)',
+                    officer_name: isDevMode ? 'Mode Dev (Uji Coba)' : 'Saya (Petugas)',
                 };
-                setRecentScans([newRecord, ...recentScans.slice(0, 14)]);
+                setRecentScans([newRecord, ...recentScans.slice(0, 19)]);
 
                 // Otomatis bersiap memindai siswa berikutnya dalam 2 detik
                 setTimeout(() => {
@@ -293,13 +354,13 @@ export default function ScannerTerminal({
 
     // Tahap 2 Alternatif: Petugas Menolak Identitas (Titip Absen)
     const handleRejectAttendance = async () => {
-        if (!verifiedStudent || !session) return;
+        if (!verifiedStudent || !currentSession) return;
 
         setIsSubmitting(true);
         try {
             await axios.post('/scanner/reject', {
                 student_id: verifiedStudent.id,
-                session_id: session.id,
+                session_id: currentSession.id,
                 device_id: selectedDevice,
                 rejection_reason: rejectionReason,
                 notes: rejectionNote,
@@ -317,6 +378,96 @@ export default function ScannerTerminal({
             setStatusMessage(error.response?.data?.message || 'Gagal mencatat penolakan.');
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    // Aksi Mode Pengembang (Dev Mode Handlers)
+    const handleDevQuickScan = (tokenToScan?: string) => {
+        let token = tokenToScan;
+        if (!token && devSelectedStudentId) {
+            const student = dev_students?.find((s) => s.id === devSelectedStudentId);
+            token = student?.token;
+        }
+        if (!token) {
+            alert('Pilih siswa terlebih dahulu dari daftar simulasi.');
+            return;
+        }
+        handleScanSuccess(token);
+    };
+
+    const handleDevRandomScan = () => {
+        if (!dev_students || dev_students.length === 0) {
+            alert('Daftar siswa untuk simulasi belum tersedia.');
+            return;
+        }
+        const randomStudent = dev_students[Math.floor(Math.random() * dev_students.length)];
+        setDevSelectedStudentId(randomStudent.id);
+        handleScanSuccess(randomStudent.token);
+    };
+
+    const handleDevBurstScan = async () => {
+        if (!currentSession) {
+            alert('Sesi hari ini belum aktif.');
+            return;
+        }
+        setIsBursting(true);
+        try {
+            const res = await axios.post('/scanner/dev/burst-scan', {
+                session_id: currentSession.id,
+                device_id: selectedDevice,
+                count: 5,
+            });
+            if (res.data.success && res.data.scans) {
+                playSound('success');
+                const newRecords = res.data.scans.map((s: any) => ({
+                    id: s.id || Date.now() + Math.random(),
+                    student_id: s.id,
+                    name: s.name,
+                    nis: s.nis,
+                    class_name: s.class_name,
+                    status: s.status,
+                    time: s.time,
+                    officer_name: 'Simulasi Dev Burst',
+                }));
+                setRecentScans((prev) => [...newRecords, ...prev].slice(0, 24));
+                setStatusMessage(`Berhasil mensimulasikan scan 5 siswa sekaligus!`);
+                setPhase('idle');
+            }
+        } catch (err: any) {
+            alert('Gagal burst scan: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setIsBursting(false);
+        }
+    };
+
+    const handleDevResetToday = async () => {
+        if (!currentSession) return;
+        if (!confirm('Apakah Anda yakin ingin MENGHAPUS SEMUA DATA ABSENSI HARI INI untuk pengujian ulang dari awal?')) return;
+        try {
+            const res = await axios.post('/scanner/dev/reset-today', {
+                session_id: currentSession.id,
+            });
+            if (res.data.success) {
+                setRecentScans([]);
+                setVerifiedStudent(null);
+                setPhase('idle');
+                setStatusMessage(`Data absensi hari ini berhasil direset (${res.data.deleted_count} rekod dihapus).`);
+                playSound('alert');
+            }
+        } catch (err: any) {
+            alert('Gagal mereset absensi: ' + (err.response?.data?.message || err.message));
+        }
+    };
+
+    const handleDevToggleSession = async () => {
+        try {
+            const res = await axios.post('/scanner/dev/toggle-session');
+            if (res.data.success && res.data.session) {
+                setCurrentSession(res.data.session);
+                setStatusMessage(`Status sesi sekarang: ${res.data.session.status.toUpperCase()}`);
+            }
+        } catch (err: any) {
+            alert('Gagal mengubah status sesi: ' + (err.response?.data?.message || err.message));
         }
     };
 
@@ -345,31 +496,32 @@ export default function ScannerTerminal({
         <AuthenticatedLayout title="Terminal Scanner Anti-Titip Absen">
             <Head title="Scanner Terminal Absensi" />
 
-            <div className="space-y-6">
+            <div className="space-y-5">
                 {/* Header Station Bar */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white rounded-xl border border-gray-200 shadow-sm gap-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white rounded-lg border border-slate-200 shadow-xs gap-4">
                     <div className="flex items-center gap-3">
-                        <div className="p-3 rounded-xl bg-[#14433b] text-white">
+                        <div className="p-2.5 rounded-lg bg-[#14433b] text-white">
                             <Camera className="w-5 h-5 text-[#21c9a4]" />
                         </div>
                         <div>
-                            <h2 className="text-base font-bold text-gray-900">
-                                Terminal Pemindaian Kartu Siswa
+                            <h2 className="text-sm font-bold text-slate-900">
+                                Terminal Pemindaian Presensi Siswa
                             </h2>
-                            <p className="text-xs text-gray-500">
-                                {session ? `Sesi ${session.type.toUpperCase()} &bull; Tanggal ${session.date}` : 'Tidak ada sesi terbuka'}
+                            <p className="text-xs text-slate-500">
+                                {currentSession ? `Sesi ${currentSession.type.toUpperCase()} · Tanggal ${currentSession.date}` : 'Tidak ada sesi terbuka'}
                             </p>
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2.5">
                         {/* Device Selector */}
                         <div className="flex items-center gap-2 text-xs">
-                            <label className="font-semibold text-gray-600">Perangkat:</label>
+                            <label className="font-medium text-slate-600">Perangkat:</label>
                             <select
                                 value={selectedDevice}
                                 onChange={(e) => setSelectedDevice(Number(e.target.value))}
-                                className="px-3 py-1.5 text-xs font-semibold rounded-lg border-gray-300 bg-gray-50 text-[#14433b] focus:ring-[#21c9a4] focus:border-[#21c9a4]"
+                                aria-label="Pilih Perangkat Kamera Scanner"
+                                className="pl-2.5 pr-8 py-1.5 text-xs font-medium rounded-md border-slate-200 bg-white text-slate-800 focus:ring-[#14433b] focus:border-[#14433b]"
                             >
                                 {devices.map((dev) => (
                                     <option key={dev.id} value={dev.id}>
@@ -380,9 +532,9 @@ export default function ScannerTerminal({
                         </div>
 
                         {/* Mode Verifikasi Badge & Fallback Button */}
-                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-50 border border-gray-200 text-[11px] font-semibold text-gray-700">
-                            <span className="text-gray-400">Verifikasi:</span>
-                            <span className="font-bold text-[#14433b]">
+                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-slate-50 border border-slate-200 text-xs text-slate-700">
+                            <span className="text-slate-400">Verifikasi:</span>
+                            <span className="font-semibold text-slate-800">
                                 {currentVerificationMode === 'webcam_visual' && 'Webcam Visual'}
                                 {currentVerificationMode === 'cctv_visual' && 'CCTV Visual'}
                                 {currentVerificationMode === 'officer_manual' && 'Manual Petugas'}
@@ -393,65 +545,188 @@ export default function ScannerTerminal({
                             <button
                                 type="button"
                                 onClick={handleTriggerFallback}
-                                className="px-2.5 py-1.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 text-[11px] font-bold flex items-center gap-1 transition-all shadow-xs"
+                                className="px-2.5 py-1.5 rounded-md border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-semibold flex items-center gap-1.5 transition-colors"
                                 title="Ganti segera ke mode verifikasi manual petugas jika kamera terganggu"
                             >
                                 <ShieldAlert className="w-3.5 h-3.5 text-amber-600" />
-                                <span>Mode Fallback</span>
+                                <span>Mode Darurat</span>
                             </button>
                         )}
 
                         {/* Sound Toggle */}
                         <button
                             onClick={() => setSoundEnabled(!soundEnabled)}
-                            className={`p-2 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                            className={`px-2.5 py-1.5 rounded-md border text-xs font-medium flex items-center gap-1.5 transition-colors ${
                                 soundEnabled
                                     ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                    : 'bg-gray-100 text-gray-500 border-gray-200'
+                                    : 'bg-slate-100 text-slate-500 border-slate-200'
                             }`}
-                            title="Aktifkan/Nonaktifkan Suara Ding Scanner"
+                            title="Aktifkan/Nonaktifkan Suara Scanner"
                         >
-                            {soundEnabled ? <Volume2 className="w-4 h-4 text-emerald-600" /> : <VolumeX className="w-4 h-4" />}
+                            {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-emerald-600" /> : <VolumeX className="w-3.5 h-3.5" />}
                             <span className="hidden sm:inline">{soundEnabled ? 'Suara Aktif' : 'Senyap'}</span>
                         </button>
+
+                        {/* Mode Dev Toggle Button (Hanya Super Admin) */}
+                        {is_super_admin && (
+                            <button
+                                type="button"
+                                onClick={toggleDevMode}
+                                className={`px-3 py-1.5 rounded-md border text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer ${
+                                    isDevMode
+                                        ? 'bg-amber-500 text-white border-amber-600 ring-2 ring-amber-300'
+                                        : 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
+                                }`}
+                                title="Mode Pengembang: Bypass batas absen berulang, simulasi scan cepat, dan kontrol testing (Khusus Super Admin)"
+                            >
+                                <Terminal className={`w-3.5 h-3.5 ${isDevMode ? 'text-white' : 'text-amber-700'}`} />
+                                <span>Mode Dev: {isDevMode ? 'AKTIF' : 'NONAKTIF'}</span>
+                            </button>
+                        )}
                     </div>
                 </div>
 
+                {/* DEV MODE TOOLBAR & CONTROL PANEL (Hanya Super Admin) */}
+                {is_super_admin && isDevMode && (
+                    <div className="p-4 bg-gradient-to-r from-amber-50 via-amber-50/70 to-orange-50 border-2 border-amber-400 rounded-lg shadow-sm space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200 pb-2">
+                            <div className="flex items-center gap-2">
+                                <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-600 text-white rounded">
+                                    DEVELOPER TESTING MODE
+                                </span>
+                                <span className="text-xs font-medium text-amber-900">
+                                    Bypass Batasan Absen Berulang & Simulasi Scanner
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs">
+                                <span className="text-amber-800 font-medium">Status Sesi:</span>
+                                <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                                    currentSession?.status === 'open' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                                }`}>
+                                    {currentSession ? currentSession.status.toUpperCase() : 'TIDAK ADA SESI'}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={handleDevToggleSession}
+                                    className="px-2 py-1 rounded bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 font-medium text-xs flex items-center gap-1 shadow-2xs transition-colors"
+                                >
+                                    {currentSession?.status === 'open' ? (
+                                        <>
+                                            <Lock className="w-3 h-3 text-rose-600" />
+                                            <span>Paksa Tutup Sesi</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Unlock className="w-3 h-3 text-emerald-600" />
+                                            <span>Paksa Buka Sesi</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Quick Simulator Tools */}
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                            {/* Pick student and Scan */}
+                            <div className="md:col-span-6 flex items-center gap-2">
+                                <select
+                                    value={devSelectedStudentId || ''}
+                                    onChange={(e) => setDevSelectedStudentId(Number(e.target.value))}
+                                    className="flex-1 py-1.5 px-2.5 text-xs rounded-md border-amber-300 bg-white text-slate-800 focus:ring-amber-500 focus:border-amber-500"
+                                >
+                                    <option value="">-- Pilih Siswa untuk Scan Cepat --</option>
+                                    {dev_students?.map((s) => (
+                                        <option key={s.id} value={s.id}>
+                                            {s.nis} - {s.name} ({s.class_name})
+                                        </option>
+                                    ))}
+                                </select>
+                                <button
+                                    type="button"
+                                    onClick={() => handleDevQuickScan()}
+                                    disabled={!devSelectedStudentId || isSubmitting}
+                                    className="px-3 py-1.5 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50 transition-colors shadow-2xs whitespace-nowrap"
+                                >
+                                    <Zap className="w-3.5 h-3.5" />
+                                    <span>Scan Siswa</span>
+                                </button>
+                            </div>
+
+                            {/* Random Scan & Burst Scan Buttons */}
+                            <div className="md:col-span-6 flex flex-wrap items-center justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={handleDevRandomScan}
+                                    disabled={isSubmitting || !dev_students || dev_students.length === 0}
+                                    className="px-2.5 py-1.5 rounded-md bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50 transition-colors shadow-2xs"
+                                >
+                                    <Dice5 className="w-3.5 h-3.5 text-amber-700" />
+                                    <span>Scan Acak</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={handleDevBurstScan}
+                                    disabled={isBursting || isSubmitting}
+                                    className="px-2.5 py-1.5 rounded-md bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50 transition-colors shadow-2xs"
+                                    title="Simulasi 5 siswa absen otomatis sekaligus"
+                                >
+                                    <span>{isBursting ? 'Memproses 5 Siswa...' : 'Burst Scan (5 Siswa)'}</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={handleDevResetToday}
+                                    className="px-2.5 py-1.5 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-2xs"
+                                    title="Hapus rekod absensi hari ini agar bisa mengulang pengujian dari awal"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                                    <span>Reset Absen Hari Ini</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-[11px] text-amber-800/80 bg-amber-100/60 px-2.5 py-1 rounded">
+                            <span><strong>Mode Dev Aktif:</strong> Siswa yang sudah absen bisa di-scan berulang kali tanpa error "Sudah Absen", sesi otomatis dibuka jika tertutup, dan log tersimpan dengan keterangan dev re-scan.</span>
+                        </div>
+                    </div>
+                )}
+
                 {/* Main Scanning Arena (2 Columns) */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
                     {/* Left Column: Camera Viewport & Manual Input (7 Cols) */}
                     <div className="lg:col-span-7 space-y-4">
-                        <div className="relative bg-gray-950 rounded-2xl overflow-hidden shadow-md border border-gray-800 min-h-[380px] flex flex-col justify-between p-4">
+                        <div className="relative bg-slate-950 rounded-lg overflow-hidden border border-slate-800 min-h-[380px] flex flex-col justify-between p-4 shadow-xs">
                             {/* Camera Header Status */}
                             <div className="flex items-center justify-between text-xs text-white z-10">
                                 <div className="flex items-center gap-2">
-                                    <span className={`w-2.5 h-2.5 rounded-full ${cameraActive ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
-                                    <span className="font-mono">{cameraActive ? 'KAMERA AKTIF (15 FPS)' : 'KAMERA NONAKTIF'}</span>
+                                    <span className={`w-2 h-2 rounded-full ${cameraActive ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
+                                    <span className="font-mono text-[11px] tracking-wide">{cameraActive ? 'KAMERA AKTIF (15 FPS)' : 'KAMERA NONAKTIF'}</span>
                                 </div>
-                                <div className="text-gray-400 font-mono text-[11px]">
-                                    {server_clock} WITA
+                                <div className="text-slate-400 font-mono text-[11px]">
+                                    {scannerClock} WITA
                                 </div>
                             </div>
 
                             {/* Viewport for Html5Qrcode Reader */}
-                            <div className="relative flex-1 flex items-center justify-center my-2">
+                            <div className="relative flex-1 flex items-center justify-center my-3">
                                 <div
                                     id={readerId}
-                                    className={`w-full max-w-[320px] rounded-xl overflow-hidden ${!cameraActive ? 'hidden' : ''}`}
+                                    className={`w-full max-w-[320px] rounded-lg overflow-hidden ${!cameraActive ? 'hidden' : ''}`}
                                 />
 
                                 {!cameraActive && (
-                                    <div className="text-center py-12 px-4 text-gray-400">
-                                        <CameraOff className="w-12 h-12 mx-auto text-gray-600 mb-3" />
-                                        <p className="text-sm font-semibold text-gray-300">Kamera Scanner Belum Diaktifkan</p>
-                                        <p className="text-xs text-gray-500 mt-1 max-w-xs mx-auto">
-                                            Klik tombol di bawah untuk menyalakan kamera web/HP atau gunakan pembaca barcode manual.
+                                    <div className="text-center py-10 px-4 text-slate-400">
+                                        <CameraOff className="w-10 h-10 mx-auto text-slate-600 mb-2.5" />
+                                        <p className="text-sm font-semibold text-slate-200">Kamera Scanner Belum Diaktifkan</p>
+                                        <p className="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
+                                            Klik tombol di bawah untuk menyalakan kamera atau gunakan pembaca barcode kartu manual.
                                         </p>
                                         <button
                                             onClick={startCamera}
-                                            className="mt-4 px-5 py-2.5 rounded-xl bg-[#21c9a4] text-[#14433b] font-bold text-xs hover:bg-[#1eb694] transition-all shadow-md active:scale-95 inline-flex items-center gap-2"
+                                            className="mt-4 px-4 py-2 rounded-lg bg-[#14433b] text-white font-medium text-xs hover:bg-[#1a554a] transition-colors inline-flex items-center gap-2 shadow-xs"
                                         >
-                                            <Camera className="w-4 h-4" />
+                                            <Camera className="w-4 h-4 text-[#21c9a4]" />
                                             <span>Mulai Kamera Scanner</span>
                                         </button>
                                     </div>
@@ -459,23 +734,23 @@ export default function ScannerTerminal({
                             </div>
 
                             {/* Camera Action Buttons */}
-                            <div className="flex items-center justify-between pt-2 border-t border-gray-800 text-xs">
+                            <div className="flex items-center justify-between pt-2.5 border-t border-slate-800 text-xs">
                                 {cameraActive ? (
                                     <button
                                         onClick={stopCamera}
-                                        className="px-3 py-1.5 rounded-lg bg-red-900/60 text-red-200 border border-red-800 hover:bg-red-900 transition-colors flex items-center gap-1.5 font-medium"
+                                        className="px-2.5 py-1.5 rounded-md bg-rose-950/70 text-rose-300 border border-rose-800/60 hover:bg-rose-900 transition-colors flex items-center gap-1.5 text-xs font-medium"
                                     >
                                         <CameraOff className="w-3.5 h-3.5" />
                                         <span>Matikan Kamera</span>
                                     </button>
                                 ) : (
-                                    <span className="text-gray-500 text-[11px]">Mode kamera offline</span>
+                                    <span className="text-slate-500 text-[11px]">Mode kamera offline</span>
                                 )}
 
                                 {phase !== 'idle' && (
                                     <button
                                         onClick={resetScannerForNext}
-                                        className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-200 hover:bg-gray-700 transition-colors flex items-center gap-1.5 font-medium ml-auto"
+                                        className="px-2.5 py-1.5 rounded-md bg-slate-800 text-slate-200 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-xs font-medium ml-auto"
                                     >
                                         <RefreshCw className="w-3.5 h-3.5" />
                                         <span>Reset Scanner</span>
@@ -485,43 +760,43 @@ export default function ScannerTerminal({
                         </div>
 
                         {/* Manual Token / Barcode Gun Input (Alternative Mode) */}
-                        <div className="p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
+                        <div className="p-3.5 bg-white rounded-lg border border-slate-200 shadow-xs">
                             <form onSubmit={handleManualSubmit} className="flex gap-2">
                                 <input
                                     type="text"
                                     value={manualToken}
                                     onChange={(e) => setManualToken(e.target.value)}
-                                    placeholder="Input / scan token barcode manual..."
-                                    className="flex-1 px-3 py-2 text-xs rounded-lg border-gray-300 focus:ring-[#21c9a4] focus:border-[#21c9a4]"
+                                    placeholder="Input atau scan token barcode kartu..."
+                                    className="flex-1 px-3 py-1.5 text-xs rounded-md border-slate-300 focus:ring-[#14433b] focus:border-[#14433b]"
                                     disabled={isSubmitting}
                                 />
                                 <button
                                     type="submit"
                                     disabled={isSubmitting || !manualToken.trim()}
-                                    className="px-4 py-2 bg-[#14433b] text-white text-xs font-bold rounded-lg hover:bg-[#1b554b] disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
+                                    className="px-3.5 py-1.5 bg-[#14433b] text-white text-xs font-medium rounded-md hover:bg-[#1a554a] disabled:opacity-50 flex items-center gap-1.5 transition-colors shadow-xs"
                                 >
                                     <Send className="w-3.5 h-3.5 text-[#21c9a4]" />
                                     <span>Periksa</span>
                                 </button>
                             </form>
-                            <p className="text-[11px] text-gray-500 mt-2">
-                                *Mendukung pembaca scanner barcode USB eksternal (tekan Enter otomatis).
+                            <p className="text-[11px] text-slate-400 mt-1.5">
+                                Mendukung barcode scanner USB eksternal (input otomatis saat kartu di-scan).
                             </p>
                         </div>
                     </div>
 
                     {/* Right Column: Identity Verification & Anti-Titip Absen Decision Box (5 Cols) */}
                     <div className="lg:col-span-5 space-y-4">
-                        <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm flex flex-col justify-between min-h-[460px]">
+                        <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-xs flex flex-col justify-between min-h-[460px]">
                             {/* Verification Stage Banner */}
-                            <div className="border-b border-gray-100 pb-3">
+                            <div className="border-b border-slate-100 pb-3">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold uppercase tracking-wider text-gray-500">
-                                        VERIFIKASI IDENTITAS FISIK
+                                    <span className="text-xs font-semibold text-slate-700">
+                                        Verifikasi Identitas Fisik
                                     </span>
                                     {phase === 'verifying' && (
-                                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 animate-pulse">
-                                            PERIKSA WAJAH SISWA
+                                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                                            Periksa Kesesuaian Wajah
                                         </span>
                                     )}
                                 </div>
@@ -530,37 +805,42 @@ export default function ScannerTerminal({
                             {/* Verification Body Content */}
                             <div className="my-auto py-4 text-center">
                                 {phase === 'verifying' && verifiedStudent && (
-                                    <div className="space-y-4 animate-in fade-in zoom-in-95">
+                                    <div className="space-y-4 animate-in fade-in">
                                         {/* Student Official Photo */}
-                                        <div className="w-28 h-36 mx-auto rounded-xl border-2 border-[#14433b] overflow-hidden shadow-md bg-gray-100 flex items-center justify-center">
+                                        <div className="w-24 h-32 mx-auto rounded-lg border border-slate-300 overflow-hidden bg-slate-100 flex items-center justify-center">
                                             {verifiedStudent.photo_path ? (
                                                 <img
-                                                    src={verifiedStudent.photo_path}
+                                                    src={
+                                                        verifiedStudent.photo_path.startsWith('/') ||
+                                                        verifiedStudent.photo_path.startsWith('http')
+                                                            ? verifiedStudent.photo_path
+                                                            : `/storage/${verifiedStudent.photo_path}`
+                                                    }
                                                     alt={verifiedStudent.name}
                                                     className="w-full h-full object-cover"
                                                 />
                                             ) : (
-                                                <div className="text-gray-400 text-xs font-semibold flex flex-col items-center">
-                                                    <UserCheck className="w-8 h-8 text-gray-300 mb-1" />
-                                                    <span>FOTO RESMI</span>
-                                                    <span className="text-[10px] text-gray-400">3 x 4</span>
+                                                <div className="text-slate-400 text-xs font-medium flex flex-col items-center">
+                                                    <UserCheck className="w-6 h-6 text-slate-400 mb-1" />
+                                                    <span>Foto Siswa</span>
+                                                    <span className="text-[10px] text-slate-400">3 x 4</span>
                                                 </div>
                                             )}
                                         </div>
 
                                         {/* Student Data */}
                                         <div>
-                                            <h3 className="text-lg font-extrabold text-gray-900">
+                                            <h3 className="text-base font-bold text-slate-900">
                                                 {verifiedStudent.name}
                                             </h3>
-                                            <p className="text-xs font-bold text-[#14433b] mt-0.5">
-                                                NIS: {verifiedStudent.nis} &bull; Kelas: {verifiedStudent.class_name}
+                                            <p className="text-xs text-slate-600 mt-0.5">
+                                                NIS: <span className="font-mono">{verifiedStudent.nis}</span> · Kelas: {verifiedStudent.class_name}
                                             </p>
                                         </div>
 
                                         {/* Time & Attendance Status Preview */}
-                                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-xs font-semibold">
-                                            <span>Status Kedatangan:</span>
+                                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-slate-50 border border-slate-200 text-xs text-slate-700">
+                                            <span>Status:</span>
                                             <StatusBadge
                                                 status={verificationDetails?.suggested_status || 'hadir'}
                                                 size="sm"
@@ -568,12 +848,12 @@ export default function ScannerTerminal({
                                         </div>
 
                                         {/* Verification Security Notice */}
-                                        <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-left text-xs text-amber-900 leading-relaxed flex items-start gap-2.5">
-                                            <ShieldAlert className="w-4 h-4 text-amber-700 flex-shrink-0 mt-0.5" />
+                                        <div className="p-3 bg-amber-50/70 rounded-lg border border-amber-200/80 text-left text-xs text-amber-900 leading-relaxed flex items-start gap-2">
+                                            <ShieldAlert className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
                                             <div>
-                                                <strong>Instruksi Anti-Titip Absen:</strong>
+                                                <strong className="font-semibold">Verifikasi Anti-Titip Absen:</strong>
                                                 <p className="text-[11px] text-amber-800 mt-0.5">
-                                                    Pastikan siswa yang berdiri di hadapan Anda benar-benar sesuai dengan foto resmi di atas. Jika kartu dibawa oleh temannya, klik <strong>Tolak</strong>.
+                                                    Pastikan siswa yang hadir di depan Anda sesuai dengan foto resmi di atas. Jika kartu dititipkan, tolak presensi.
                                                 </p>
                                             </div>
                                         </div>
@@ -583,7 +863,7 @@ export default function ScannerTerminal({
                                             <button
                                                 onClick={handleConfirmAttendance}
                                                 disabled={isSubmitting}
-                                                className="w-full py-3 px-4 rounded-xl bg-[#14433b] text-white font-bold text-xs sm:text-sm hover:bg-[#1b554b] shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+                                                className="w-full py-2.5 px-3 rounded-lg bg-[#14433b] text-white font-medium text-xs hover:bg-[#1a554a] flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 shadow-xs"
                                             >
                                                 <CheckCircle2 className="w-4 h-4 text-[#21c9a4]" />
                                                 <span>Konfirmasi Hadir</span>
@@ -592,32 +872,32 @@ export default function ScannerTerminal({
                                             <button
                                                 onClick={() => setRejectionModalOpen(true)}
                                                 disabled={isSubmitting}
-                                                className="w-full py-3 px-4 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 font-bold text-xs sm:text-sm hover:bg-rose-100 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+                                                className="w-full py-2.5 px-3 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 font-medium text-xs hover:bg-rose-100 flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
                                             >
                                                 <XCircle className="w-4 h-4 text-rose-600" />
-                                                <span>Tolak / Curiga</span>
+                                                <span>Tolak / Titip Absen</span>
                                             </button>
                                         </div>
                                     </div>
                                 )}
 
                                 {phase === 'success' && (
-                                    <div className="space-y-3 py-8 animate-in fade-in zoom-in-95">
-                                        <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-sm">
-                                            <CheckCircle2 className="w-10 h-10" />
+                                    <div className="space-y-3 py-8 animate-in fade-in">
+                                        <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
+                                            <CheckCircle2 className="w-7 h-7" />
                                         </div>
-                                        <h3 className="text-base font-extrabold text-emerald-900">
-                                            ABSENSI SAH TERCATAT
+                                        <h3 className="text-sm font-bold text-emerald-900">
+                                            Presensi Berhasil Dicatat
                                         </h3>
-                                        <p className="text-xs text-gray-600 max-w-xs mx-auto">
+                                        <p className="text-xs text-slate-600 max-w-xs mx-auto">
                                             {statusMessage}
                                         </p>
-                                        <div className="pt-4">
+                                        <div className="pt-3">
                                             <button
                                                 onClick={resetScannerForNext}
-                                                className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 text-xs font-semibold hover:bg-gray-200"
+                                                className="px-3.5 py-1.5 rounded-md bg-slate-100 text-slate-700 text-xs font-medium hover:bg-slate-200 transition-colors"
                                             >
-                                                Pindai Siswa Berikutnya &rarr;
+                                                Pindai Siswa Berikutnya →
                                             </button>
                                         </div>
                                     </div>
@@ -625,38 +905,50 @@ export default function ScannerTerminal({
 
                                 {phase === 'duplicate' && verifiedStudent && (
                                     <div className="space-y-3 py-6 animate-in fade-in">
-                                        <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto">
-                                            <AlertTriangle className="w-9 h-9" />
+                                        <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
+                                            <AlertTriangle className="w-6 h-6" />
                                         </div>
-                                        <h3 className="text-base font-extrabold text-amber-900">
-                                            DUPLIKAT: SUDAH ABSEN
+                                        <h3 className="text-sm font-bold text-amber-900">
+                                            Duplikat: Sudah Absen
                                         </h3>
-                                        <p className="text-xs text-gray-600 max-w-xs mx-auto">
+                                        <p className="text-xs text-slate-600 max-w-xs mx-auto">
                                             Siswa <strong>{verifiedStudent.name}</strong> ({verifiedStudent.nis}) sudah tercatat hadir pada sesi ini sebelumnya.
                                         </p>
-                                        <button
-                                            onClick={resetScannerForNext}
-                                            className="px-4 py-2 mt-2 rounded-lg bg-amber-600 text-white text-xs font-bold hover:bg-amber-700"
-                                        >
-                                            Siap Scan Berikutnya
-                                        </button>
+                                        <div className="flex items-center justify-center gap-2 pt-2">
+                                            <button
+                                                onClick={resetScannerForNext}
+                                                className="px-3 py-1.5 rounded-md bg-amber-700 text-white text-xs font-medium hover:bg-amber-800 transition-colors"
+                                            >
+                                                Siap Scan Berikutnya
+                                            </button>
+                                            {isDevMode && (
+                                                <button
+                                                    onClick={handleConfirmAttendance}
+                                                    disabled={isSubmitting}
+                                                    className="px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 transition-colors flex items-center gap-1 shadow-2xs"
+                                                >
+                                                    <RefreshCw className="w-3 h-3" />
+                                                    <span>Absen Ulang (Dev Mode)</span>
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
 
                                 {phase === 'rejected' && (
                                     <div className="space-y-3 py-6 animate-in fade-in">
-                                        <div className="w-16 h-16 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
-                                            <XCircle className="w-9 h-9" />
+                                        <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-700 flex items-center justify-center mx-auto">
+                                            <XCircle className="w-6 h-6" />
                                         </div>
-                                        <h3 className="text-base font-extrabold text-rose-900">
-                                            PEMINDAIAN DITOLAK
+                                        <h3 className="text-sm font-bold text-rose-900">
+                                            Pemindaian Ditolak
                                         </h3>
-                                        <p className="text-xs text-rose-700 font-medium max-w-xs mx-auto">
+                                        <p className="text-xs text-rose-700 max-w-xs mx-auto">
                                             {statusMessage}
                                         </p>
                                         <button
                                             onClick={resetScannerForNext}
-                                            className="px-4 py-2 mt-2 rounded-lg bg-gray-200 text-gray-800 text-xs font-bold hover:bg-gray-300"
+                                            className="px-3 py-1.5 mt-2 rounded-md bg-slate-200 text-slate-800 text-xs font-medium hover:bg-slate-300 transition-colors"
                                         >
                                             Pindai Ulang
                                         </button>
@@ -664,63 +956,74 @@ export default function ScannerTerminal({
                                 )}
 
                                 {phase === 'idle' && (
-                                    <div className="py-12 text-gray-400">
-                                        <ShieldAlert className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                                        <p className="text-xs font-semibold text-gray-600">Menunggu Pemindaian Kartu Siswa</p>
-                                        <p className="text-[11px] text-gray-400 mt-1">
-                                            Dekatkan kode QR siswa ke kamera scanner.
+                                    <div className="py-12 text-slate-400">
+                                        <ShieldAlert className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                                        <p className="text-xs font-medium text-slate-600">Menunggu Pemindaian Kartu Siswa</p>
+                                        <p className="text-[11px] text-slate-400 mt-1">
+                                            Dekatkan QR code siswa ke kamera scanner atau masukkan token manual.
                                         </p>
                                     </div>
                                 )}
 
                                 {phase === 'scanning' && (
                                     <div className="py-12 text-[#14433b]">
-                                        <div className="w-10 h-10 border-4 border-[#21c9a4] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                                        <p className="text-xs font-bold">Kamera Siap Menerima Kartu</p>
-                                        <p className="text-[11px] text-gray-500 mt-1">
-                                            Arahkan QR Code tepat di dalam kotak fokus kamera.
+                                        <div className="w-8 h-8 border-2 border-[#14433b] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                                        <p className="text-xs font-semibold text-slate-800">Kamera Siap Menerima Kartu</p>
+                                        <p className="text-[11px] text-slate-500 mt-1">
+                                            Arahkan QR Code ke area kotak fokus kamera.
                                         </p>
                                     </div>
                                 )}
                             </div>
 
                             {/* Status Bottom Footer */}
-                            <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-400">
-                                <span>Protokol Keamanan: SHA-256 Auth</span>
-                                <span>Anti-Titip Absen V1.0</span>
+                            <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                                <span>Autentikasi SHA-256</span>
+                                <span>Verifikasi Anti-Titip Absen</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 {/* Recent Session History on this Scanner Station */}
-                <div className="p-5 bg-white rounded-xl border border-gray-200 shadow-sm">
-                    <h3 className="text-sm font-bold text-gray-900 mb-3">
-                        Pemindaian Terkonfirmasi di Stasiun Ini ({recentScans.length} Siswa Terakhir)
-                    </h3>
+                <div className="bg-white rounded-lg border border-slate-200 shadow-xs overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                        <h3 className="text-xs font-semibold text-slate-800">
+                            Pemindaian Terkonfirmasi di Stasiun Ini ({recentScans.length} Siswa Terakhir)
+                        </h3>
+                        <span className="text-[11px] text-slate-400">Pembaruan otomatis realtime</span>
+                    </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs">
                             <thead>
-                                <tr className="border-b border-gray-200 text-gray-500 font-semibold bg-gray-50/50">
-                                    <th className="py-2 px-3">Jam Scan</th>
-                                    <th className="py-2 px-3">NIS</th>
-                                    <th className="py-2 px-3">Nama Siswa</th>
-                                    <th className="py-2 px-3">Kelas</th>
-                                    <th className="py-2 px-3">Status</th>
-                                    <th className="py-2 px-3">Petugas Otoritas</th>
+                                <tr className="border-b border-slate-200 text-slate-600 font-semibold bg-slate-50/75">
+                                    <th className="py-2.5 px-3">Jam Scan</th>
+                                    <th className="py-2.5 px-3">NIS</th>
+                                    <th className="py-2.5 px-3">Nama Siswa</th>
+                                    <th className="py-2.5 px-3">Kelas</th>
+                                    <th className="py-2.5 px-3">Status</th>
+                                    <th className="py-2.5 px-3">Petugas Otoritas</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {recentScans.slice(0, 10).map((r) => (
-                                    <tr key={r.id} className="hover:bg-gray-50">
-                                        <td className="py-2 px-3 font-mono font-bold text-gray-700">{r.time}</td>
-                                        <td className="py-2 px-3 font-mono text-gray-600">{r.nis}</td>
-                                        <td className="py-2 px-3 font-semibold text-gray-900">{r.name}</td>
-                                        <td className="py-2 px-3 text-gray-600">{r.class_name}</td>
-                                        <td className="py-2 px-3"><StatusBadge status={r.status} size="sm" /></td>
-                                        <td className="py-2 px-3 text-gray-500">{r.officer_name}</td>
+                            <tbody className="divide-y divide-slate-100 text-slate-700">
+                                {recentScans.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={6} className="py-6 text-center text-slate-400">
+                                            Belum ada presensi yang tercatat di stasiun ini pada sesi berjalan.
+                                        </td>
                                     </tr>
-                                ))}
+                                ) : (
+                                    recentScans.slice(0, 10).map((r) => (
+                                        <tr key={r.id} className="hover:bg-slate-50/60 transition-colors">
+                                            <td className="py-2.5 px-3 font-mono font-medium text-slate-700">{r.time}</td>
+                                            <td className="py-2.5 px-3 font-mono text-slate-600">{r.nis}</td>
+                                            <td className="py-2.5 px-3 font-medium text-slate-900">{r.name}</td>
+                                            <td className="py-2.5 px-3 text-slate-600">{r.class_name}</td>
+                                            <td className="py-2.5 px-3"><StatusBadge status={r.status} size="sm" /></td>
+                                            <td className="py-2.5 px-3 text-slate-500">{r.officer_name}</td>
+                                        </tr>
+                                    ))
+                                )}
                             </tbody>
                         </table>
                     </div>
@@ -729,27 +1032,27 @@ export default function ScannerTerminal({
 
             {/* Modal Rejection / Titip Absen Dialog */}
             {rejectionModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="w-full max-w-md bg-white rounded-2xl p-6 shadow-xl border border-gray-200 space-y-4 animate-in fade-in zoom-in-95">
-                        <div className="flex items-center gap-3 text-rose-600">
-                            <div className="p-2.5 rounded-xl bg-rose-100">
-                                <UserX className="w-6 h-6" />
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+                    <div className="w-full max-w-md bg-white rounded-lg p-5 shadow-lg border border-slate-200 space-y-4 animate-in fade-in">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-rose-50 text-rose-700 border border-rose-200">
+                                <UserX className="w-5 h-5" />
                             </div>
                             <div>
-                                <h3 className="text-base font-bold text-gray-900">Tolak & Laporkan Kecurigaan</h3>
-                                <p className="text-xs text-gray-500">Pencatatan pelanggaran atau anomali identitas</p>
+                                <h3 className="text-sm font-bold text-slate-900">Tolak & Laporkan Presensi</h3>
+                                <p className="text-xs text-slate-500">Pencatatan pelanggaran atau indikasi titip absen</p>
                             </div>
                         </div>
 
                         <div className="space-y-3 text-xs">
                             <div>
-                                <label className="block font-semibold text-gray-700 mb-1">
-                                    Pilih Alasan Penolakan:
+                                <label className="block font-medium text-slate-700 mb-1">
+                                    Alasan Penolakan <span className="text-rose-500">*</span>
                                 </label>
                                 <select
                                     value={rejectionReason}
                                     onChange={(e) => setRejectionReason(e.target.value)}
-                                    className="w-full rounded-lg border-gray-300 text-xs focus:ring-rose-500 focus:border-rose-500"
+                                    className="w-full rounded-md border-slate-300 text-xs focus:ring-[#14433b] focus:border-[#14433b]"
                                 >
                                     <option value="Kartu dititipkan (Pemilik kartu tidak hadir)">
                                         Kartu dititipkan (Pemilik kartu tidak hadir fisik)
@@ -768,24 +1071,24 @@ export default function ScannerTerminal({
                             </div>
 
                             <div>
-                                <label className="block font-semibold text-gray-700 mb-1">
-                                    Catatan Tambahan (Opsional):
+                                <label className="block font-medium text-slate-700 mb-1">
+                                    Catatan Tambahan (Opsional)
                                 </label>
                                 <textarea
                                     value={rejectionNote}
                                     onChange={(e) => setRejectionNote(e.target.value)}
                                     rows={3}
-                                    placeholder="Contoh: Kartu dibawa oleh siswa kelas X MIPA 2 atas nama Budi..."
-                                    className="w-full rounded-lg border-gray-300 text-xs focus:ring-rose-500 focus:border-rose-500"
+                                    placeholder="Contoh: Kartu dibawa oleh siswa kelas X MIPA 2..."
+                                    className="w-full rounded-md border-slate-300 text-xs focus:ring-[#14433b] focus:border-[#14433b]"
                                 />
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                        <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                             <button
                                 type="button"
                                 onClick={() => setRejectionModalOpen(false)}
-                                className="px-4 py-2 text-xs font-semibold text-gray-600 rounded-lg hover:bg-gray-100"
+                                className="px-3 py-1.5 text-xs font-medium text-slate-600 rounded-md hover:bg-slate-100 transition-colors"
                             >
                                 Batal
                             </button>
@@ -793,9 +1096,9 @@ export default function ScannerTerminal({
                                 type="button"
                                 onClick={handleRejectAttendance}
                                 disabled={isSubmitting}
-                                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 rounded-lg hover:bg-rose-700 shadow-sm"
+                                className="px-3 py-1.5 text-xs font-medium text-white bg-rose-700 rounded-md hover:bg-rose-800 transition-colors shadow-xs"
                             >
-                                Catat Penolakan ke Log
+                                Catat Penolakan
                             </button>
                         </div>
                     </div>

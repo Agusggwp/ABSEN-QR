@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Pagination from '@/Components/Pagination';
 import { Head, router } from '@inertiajs/react';
@@ -21,6 +21,25 @@ interface UsersIndexProps {
 export default function UsersIndex({ users, filters, roles }: UsersIndexProps) {
     const [search, setSearch] = useState(filters.search || '');
     const [role, setRole] = useState(filters.role || 'all');
+    const isFirstRender = useRef(true);
+
+    // Live debounced filter without loading bar
+    useEffect(() => {
+        if (isFirstRender.current) {
+            isFirstRender.current = false;
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            router.get(
+                '/users',
+                { search, role },
+                { preserveState: true, preserveScroll: true, replace: true, showProgress: false }
+            );
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [search, role]);
 
     const [modalOpen, setModalOpen] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
@@ -36,7 +55,11 @@ export default function UsersIndex({ users, filters, roles }: UsersIndexProps) {
 
     const handleFilterSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        router.get('/users', { search, role }, { preserveState: true, replace: true });
+        router.get(
+            '/users',
+            { search, role },
+            { preserveState: true, preserveScroll: true, replace: true, showProgress: false }
+        );
     };
 
     const openAddModal = () => {
@@ -96,38 +119,38 @@ export default function UsersIndex({ users, filters, roles }: UsersIndexProps) {
         <AuthenticatedLayout title="Pengguna & Hak Akses (RBAC)">
             <Head title="Pengguna & Hak Akses" />
 
-            <div className="space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-white rounded-xl border border-gray-200 shadow-sm">
+            <div className="space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-white rounded-lg border border-slate-200 shadow-xs">
                     <div>
-                        <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                            <ShieldCheck className="w-5 h-5 text-[#14433b]" />
+                        <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                            <ShieldCheck className="w-4 h-4 text-[#14433b]" />
                             <span>Pengguna & Hak Akses Sistem ({users.total} Akun)</span>
                         </h2>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-slate-500 mt-0.5">
                             Role-Based Access Control (Super Admin, Admin Sekolah, Petugas Absensi, Guru, Kepala Sekolah)
                         </p>
                     </div>
 
                     <button
                         onClick={openAddModal}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-[#14433b] text-white hover:bg-[#1b554b] shadow-sm active:scale-95 transition-all"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-[#14433b] text-white hover:bg-[#1a554a] transition-colors shadow-xs"
                     >
-                        <Plus className="w-4 h-4 text-[#21c9a4]" />
+                        <Plus className="w-3.5 h-3.5 text-[#21c9a4]" />
                         <span>Tambah Akun Pengguna</span>
                     </button>
                 </div>
 
                 {/* Filter */}
-                <div className="p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
-                    <form onSubmit={handleFilterSubmit} className="grid grid-cols-1 sm:grid-cols-12 gap-3 text-xs">
+                <div className="p-3.5 bg-white rounded-lg border border-slate-200 shadow-xs">
+                    <form onSubmit={handleFilterSubmit} className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 text-xs">
                         <div className="sm:col-span-8 relative">
-                            <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
+                            <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
                             <input
                                 type="text"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 placeholder="Cari nama atau email pengguna..."
-                                className="w-full pl-9 pr-3 py-2 text-xs rounded-lg border-gray-300 focus:ring-[#21c9a4] focus:border-[#21c9a4]"
+                                className="w-full pl-9 pr-3 py-1.5 text-xs rounded-md border-slate-300 focus:ring-[#14433b] focus:border-[#14433b]"
                             />
                         </div>
 
@@ -135,7 +158,7 @@ export default function UsersIndex({ users, filters, roles }: UsersIndexProps) {
                             <select
                                 value={role}
                                 onChange={(e) => setRole(e.target.value)}
-                                className="w-full py-2 px-3 text-xs rounded-lg border-gray-300 focus:ring-[#21c9a4] focus:border-[#21c9a4]"
+                                className="w-full py-1.5 pl-3 pr-8 text-xs rounded-md border-slate-300 focus:ring-[#14433b] focus:border-[#14433b] bg-white"
                             >
                                 <option value="all">Semua Role</option>
                                 {Object.entries(roles).map(([key, label]) => (
@@ -147,41 +170,43 @@ export default function UsersIndex({ users, filters, roles }: UsersIndexProps) {
                 </div>
 
                 {/* Users Table */}
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="bg-white rounded-lg border border-slate-200 shadow-xs overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs">
                             <thead>
-                                <tr className="border-b border-gray-200 text-gray-500 font-semibold bg-gray-50/70">
-                                    <th className="py-3 px-4">Nama Pengguna</th>
-                                    <th className="py-3 px-4">Email Login</th>
-                                    <th className="py-3 px-4">Role Akses</th>
-                                    <th className="py-3 px-4">Nomor HP</th>
-                                    <th className="py-3 px-4 text-center">Status</th>
-                                    <th className="py-3 px-4 text-right">Aksi</th>
+                                <tr className="border-b border-slate-200 text-slate-600 font-semibold bg-slate-50/75">
+                                    <th className="py-2.5 px-3.5">Nama Pengguna</th>
+                                    <th className="py-2.5 px-3.5">Email Login</th>
+                                    <th className="py-2.5 px-3.5">Role Akses</th>
+                                    <th className="py-2.5 px-3.5">Nomor HP</th>
+                                    <th className="py-2.5 px-3.5 text-center">Status</th>
+                                    <th className="py-2.5 px-3.5 text-right">Aksi</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
+                            <tbody className="divide-y divide-slate-100 text-slate-700">
                                 {users.data.map((u) => (
-                                    <tr key={u.id} className="hover:bg-gray-50/80 transition-colors">
-                                        <td className="py-3 px-4 font-bold text-gray-900">{u.name}</td>
-                                        <td className="py-3 px-4 font-mono text-gray-600">{u.email}</td>
-                                        <td className="py-3 px-4">
-                                            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-[#14433b]/10 text-[#14433b] uppercase">
+                                    <tr key={u.id} className="hover:bg-slate-50/60 transition-colors">
+                                        <td className="py-2.5 px-3.5 font-medium text-slate-900">{u.name}</td>
+                                        <td className="py-2.5 px-3.5 font-mono text-slate-600">{u.email}</td>
+                                        <td className="py-2.5 px-3.5">
+                                            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
                                                 {roles[u.role] || u.role}
                                             </span>
                                         </td>
-                                        <td className="py-3 px-4 font-mono text-gray-600">{u.phone || '-'}</td>
-                                        <td className="py-3 px-4 text-center">
-                                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                                                u.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-700'
+                                        <td className="py-2.5 px-3.5 font-mono text-slate-600">{u.phone || '-'}</td>
+                                        <td className="py-2.5 px-3.5 text-center">
+                                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-medium border ${
+                                                u.is_active
+                                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                                    : 'bg-slate-100 text-slate-600 border-slate-200'
                                             }`}>
-                                                {u.is_active ? 'AKTIF' : 'NONAKTIF'}
+                                                {u.is_active ? 'Aktif' : 'Nonaktif'}
                                             </span>
                                         </td>
-                                        <td className="py-3 px-4 text-right">
+                                        <td className="py-2.5 px-3.5 text-right">
                                             <button
                                                 onClick={() => openEditModal(u)}
-                                                className="p-1.5 text-gray-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
+                                                className="p-1 text-slate-400 hover:text-slate-700 rounded-md transition-colors"
                                                 title="Edit Akun"
                                             >
                                                 <Edit2 className="w-3.5 h-3.5" />
@@ -193,7 +218,7 @@ export default function UsersIndex({ users, filters, roles }: UsersIndexProps) {
                         </table>
                     </div>
 
-                    <div className="px-4 border-t border-gray-100">
+                    <div className="px-4 border-t border-slate-100">
                         <Pagination links={users.links} />
                     </div>
                 </div>
@@ -201,53 +226,53 @@ export default function UsersIndex({ users, filters, roles }: UsersIndexProps) {
 
             {/* Modal Tambah / Edit Pengguna */}
             {modalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="w-full max-w-md bg-white rounded-2xl p-6 shadow-xl border border-gray-200 space-y-4 animate-in fade-in zoom-in-95">
-                        <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-                            <h3 className="text-base font-bold text-gray-900">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+                    <div className="w-full max-w-md bg-white rounded-lg p-5 shadow-lg border border-slate-200 space-y-4 animate-in fade-in">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <h3 className="text-sm font-bold text-slate-900">
                                 {isEditing ? 'Edit Akun Pengguna' : 'Tambah Akun Pengguna'}
                             </h3>
-                            <button onClick={() => setModalOpen(false)} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg">
-                                <X className="w-5 h-5" />
+                            <button onClick={() => setModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded-md">
+                                <X className="w-4 h-4" />
                             </button>
                         </div>
 
-                        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+                        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
                             <div>
-                                <label className="block font-semibold text-gray-700 mb-1">
+                                <label className="block font-medium text-slate-700 mb-1">
                                     Nama Lengkap <span className="text-rose-500">*</span>
                                 </label>
                                 <input
                                     type="text"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
-                                    className="w-full rounded-lg border-gray-300 text-xs focus:ring-[#21c9a4] focus:border-[#21c9a4]"
+                                    className="w-full rounded-md border-slate-300 text-xs focus:ring-[#14433b] focus:border-[#14433b]"
                                     required
                                 />
                             </div>
 
                             <div>
-                                <label className="block font-semibold text-gray-700 mb-1">
+                                <label className="block font-medium text-slate-700 mb-1">
                                     Email Login <span className="text-rose-500">*</span>
                                 </label>
                                 <input
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full rounded-lg border-gray-300 text-xs focus:ring-[#21c9a4] focus:border-[#21c9a4]"
+                                    className="w-full rounded-md border-slate-300 text-xs focus:ring-[#14433b] focus:border-[#14433b]"
                                     required
                                 />
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block font-semibold text-gray-700 mb-1">
+                                    <label className="block font-medium text-slate-700 mb-1">
                                         Hak Akses (Role) <span className="text-rose-500">*</span>
                                     </label>
                                     <select
                                         value={userRole}
                                         onChange={(e) => setUserRole(e.target.value as any)}
-                                        className="w-full rounded-lg border-gray-300 text-xs focus:ring-[#21c9a4] focus:border-[#21c9a4]"
+                                        className="w-full rounded-md border-slate-300 text-xs focus:ring-[#14433b] focus:border-[#14433b]"
                                     >
                                         {Object.entries(roles).map(([k, v]) => (
                                             <option key={k} value={k}>{v}</option>
@@ -256,18 +281,18 @@ export default function UsersIndex({ users, filters, roles }: UsersIndexProps) {
                                 </div>
 
                                 <div>
-                                    <label className="block font-semibold text-gray-700 mb-1">Nomor Telepon</label>
+                                    <label className="block font-medium text-slate-700 mb-1">Nomor Telepon</label>
                                     <input
                                         type="text"
                                         value={phone}
                                         onChange={(e) => setPhone(e.target.value)}
-                                        className="w-full rounded-lg border-gray-300 text-xs focus:ring-[#21c9a4] focus:border-[#21c9a4]"
+                                        className="w-full rounded-md border-slate-300 text-xs focus:ring-[#14433b] focus:border-[#14433b]"
                                     />
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block font-semibold text-gray-700 mb-1">
+                                <label className="block font-medium text-slate-700 mb-1">
                                     {isEditing ? 'Kata Sandi Baru (Kosongkan bila tidak diganti)' : 'Kata Sandi (Minimal 8 karakter) *'}
                                 </label>
                                 <input
@@ -275,18 +300,18 @@ export default function UsersIndex({ users, filters, roles }: UsersIndexProps) {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     placeholder="Minimal 8 karakter"
-                                    className="w-full rounded-lg border-gray-300 text-xs focus:ring-[#21c9a4] focus:border-[#21c9a4]"
+                                    className="w-full rounded-md border-slate-300 text-xs focus:ring-[#14433b] focus:border-[#14433b]"
                                     required={!isEditing}
                                 />
                             </div>
 
                             {isEditing && (
                                 <div>
-                                    <label className="block font-semibold text-gray-700 mb-1">Status Keaktifan</label>
+                                    <label className="block font-medium text-slate-700 mb-1">Status Keaktifan</label>
                                     <select
                                         value={isActive ? '1' : '0'}
                                         onChange={(e) => setIsActive(e.target.value === '1')}
-                                        className="w-full rounded-lg border-gray-300 text-xs focus:ring-[#21c9a4] focus:border-[#21c9a4]"
+                                        className="w-full rounded-md border-slate-300 text-xs focus:ring-[#14433b] focus:border-[#14433b]"
                                     >
                                         <option value="1">Aktif</option>
                                         <option value="0">Nonaktif</option>
@@ -294,18 +319,18 @@ export default function UsersIndex({ users, filters, roles }: UsersIndexProps) {
                                 </div>
                             )}
 
-                            <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+                            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                                 <button
                                     type="button"
                                     onClick={() => setModalOpen(false)}
-                                    className="px-4 py-2 text-xs font-semibold text-gray-600 rounded-lg hover:bg-gray-100"
+                                    className="px-3 py-1.5 text-xs font-medium text-slate-600 rounded-md hover:bg-slate-100 transition-colors"
                                 >
                                     Batal
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={isSaving}
-                                    className="px-4 py-2 text-xs font-bold text-white bg-[#14433b] rounded-lg hover:bg-[#1b554b] shadow-sm disabled:opacity-50"
+                                    className="px-3.5 py-1.5 text-xs font-medium text-white bg-[#14433b] rounded-md hover:bg-[#1a554a] shadow-xs disabled:opacity-50 transition-colors"
                                 >
                                     {isSaving ? 'Menyimpan...' : 'Simpan Akun'}
                                 </button>

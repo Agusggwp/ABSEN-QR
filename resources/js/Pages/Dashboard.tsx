@@ -7,15 +7,13 @@ import {
     Users,
     UserCheck,
     Clock,
-    HeartPulse,
-    UserX,
+    AlertCircle,
     QrCode,
     Camera,
     Radio,
     Calendar,
     ArrowRight,
-    CheckCircle2,
-    AlertTriangle,
+    ChevronRight,
 } from 'lucide-react';
 import {
     BarChart,
@@ -106,178 +104,184 @@ export default function Dashboard({
     current_date,
 }: DashboardProps) {
     return (
-        <AuthenticatedLayout title="Dashboard Kehadiran Siswa">
-            <Head title="Dashboard Kehadiran" />
+        <AuthenticatedLayout title="Dashboard Presensi Siswa">
+            <Head title="Dashboard Presensi" />
 
-            <div className="space-y-6">
-                {/* Active Session & School Clock Banner */}
-                <div className="relative overflow-hidden bg-gradient-to-r from-[#14433b] to-[#1c554b] rounded-2xl p-6 text-white shadow-sm border border-emerald-950/20">
-                    <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div>
-                            <div className="flex items-center gap-2">
-                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#21c9a4] text-[#14433b]">
-                                    {session ? `SESI ${session.type.toUpperCase()} DIBUKA` : 'SESI STANDBY'}
-                                </span>
-                                <span className="text-xs text-white/80">{current_date}</span>
-                            </div>
-                            <h1 className="mt-2 text-xl sm:text-2xl font-bold tracking-tight">
-                                ARTDEVATA School Attendance System
-                            </h1>
-                            <p className="mt-1 text-xs sm:text-sm text-emerald-100/90 max-w-xl">
-                                Sistem pemantauan absensi terverifikasi dengan proteksi anti-titip absen untuk 1.000 siswa sekolah.
-                            </p>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                            <Link
-                                href="/scanner"
-                                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#21c9a4] text-[#14433b] font-bold text-xs sm:text-sm hover:bg-[#1eb694] transition-all shadow-md active:scale-95"
-                            >
-                                <QrCode className="w-4 h-4" />
-                                <span>Buka Scanner QR</span>
-                            </Link>
-                        </div>
+            <div className="space-y-5 text-slate-800">
+                {/* Page Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200">
+                    <div>
+                        <h1 className="text-lg font-bold text-slate-900 tracking-tight">
+                            Ringkasan Presensi Siswa
+                        </h1>
+                        <p className="text-xs text-slate-500">
+                            Pemantauan absensi terverifikasi dan aktivitas presensi hari ini ({current_date})
+                        </p>
                     </div>
 
-                    {/* Quick Session Schedule Indicators */}
-                    {session && (
-                        <div className="mt-5 pt-4 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                            <div>
-                                <span className="text-white/60">Jam Mulai Sesi:</span>
-                                <p className="font-bold font-mono text-[#21c9a4]">{session.start_time.slice(0, 5)} WITA</p>
-                            </div>
-                            <div>
-                                <span className="text-white/60">Batas Toleransi Terlambat:</span>
-                                <p className="font-bold font-mono text-amber-300">{session.late_time.slice(0, 5)} WITA</p>
-                            </div>
-                            <div>
-                                <span className="text-white/60">Penutupan Sesi:</span>
-                                <p className="font-bold font-mono text-white">{session.end_time.slice(0, 5)} WITA</p>
-                            </div>
-                            <div>
-                                <span className="text-white/60">Tingkat Kehadiran:</span>
-                                <p className="font-bold text-[#21c9a4]">{metrics.attendance_percentage}%</p>
-                            </div>
-                        </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href="/scanner"
+                            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[#14433b] hover:bg-[#1a5349] text-white font-medium text-xs shadow-xs transition-colors"
+                        >
+                            <QrCode className="w-4 h-4 text-[#21c9a4]" />
+                            <span>Buka Terminal Scanner</span>
+                        </Link>
+                    </div>
                 </div>
 
-                {/* Primary Metrics Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Session Status Strip */}
+                <div className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-4 text-xs">
+                    <div className="flex items-center gap-3">
+                        <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${
+                                session
+                                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                    : 'bg-slate-100 text-slate-700 border border-slate-200'
+                            }`}
+                        >
+                            <span
+                                className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                                    session ? 'bg-emerald-500' : 'bg-slate-400'
+                                }`}
+                            />
+                            {session ? `Sesi ${session.type} Dibuka` : 'Sesi Standby'}
+                        </span>
+                        {session && (
+                            <span className="text-slate-600 font-mono text-[11px]">
+                                {session.start_time.slice(0, 5)} - {session.end_time.slice(0, 5)} WITA (Batas Terlambat: {session.late_time.slice(0, 5)} WITA)
+                            </span>
+                        )}
+                    </div>
+
+                    <div className="flex items-center gap-4 text-[11px] text-slate-500">
+                        <span>
+                            Tingkat Kehadiran:{' '}
+                            <strong className="text-slate-900 font-bold">
+                                {metrics.attendance_percentage}%
+                            </strong>
+                        </span>
+                        <span>
+                            Belum Absen:{' '}
+                            <strong className="text-slate-900 font-bold">
+                                {metrics.belum_absen}
+                            </strong>
+                        </span>
+                    </div>
+                </div>
+
+                {/* Primary Metric Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <StatCard
                         title="Total Siswa Aktif"
                         value={metrics.total_students}
-                        subtitle="Kapasitas 1.000 Siswa Terdaftar"
+                        subtitle="Kapasitas siswa terdaftar"
                         icon={Users}
-                        color="brand"
                     />
                     <StatCard
                         title="Hadir Tepat Waktu"
                         value={metrics.hadir}
                         subtitle={`${metrics.attendance_percentage}% dari total siswa`}
                         icon={UserCheck}
-                        color="accent"
+                        badge="Tepat Waktu"
                     />
                     <StatCard
-                        title="Terlambat Hadir"
+                        title="Terlambat"
                         value={metrics.terlambat}
-                        subtitle="Lewat dari batas jam sekolah"
+                        subtitle="Melewati batas jam sesi"
                         icon={Clock}
-                        color="amber"
                     />
                     <StatCard
-                        title="Izin / Sakit / Dispensasi"
-                        value={metrics.izin + metrics.sakit + metrics.dispensasi}
-                        subtitle={`${metrics.izin} Izin | ${metrics.sakit} Sakit`}
-                        icon={HeartPulse}
-                        color="blue"
+                        title="Izin / Sakit / Alpa"
+                        value={metrics.izin + metrics.sakit + metrics.alpa}
+                        subtitle={`${metrics.izin + metrics.sakit} Berizin, ${metrics.alpa} Alpa`}
+                        icon={AlertCircle}
                     />
-                </div>
-
-                {/* Secondary Status Row */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                    <div className="p-4 bg-white rounded-xl border border-gray-200">
-                        <span className="text-xs text-gray-500 font-medium">Belum Melakukan Absen</span>
-                        <p className="mt-1 text-xl font-extrabold text-gray-800">{metrics.belum_absen}</p>
-                    </div>
-                    <div className="p-4 bg-white rounded-xl border border-rose-200 bg-rose-50/20">
-                        <span className="text-xs text-rose-600 font-medium">Alpa (Tanpa Keterangan)</span>
-                        <p className="mt-1 text-xl font-extrabold text-rose-700">{metrics.alpa}</p>
-                    </div>
-                    <div className="p-4 bg-white rounded-xl border border-amber-200 bg-amber-50/20">
-                        <span className="text-xs text-amber-700 font-medium">Perlu Verifikasi</span>
-                        <p className="mt-1 text-xl font-extrabold text-amber-800">{metrics.perlu_verifikasi}</p>
-                    </div>
-                    <div className="p-4 bg-white rounded-xl border border-emerald-200 bg-emerald-50/20">
-                        <span className="text-xs text-emerald-700 font-medium">Persentase Kehadiran</span>
-                        <p className="mt-1 text-xl font-extrabold text-emerald-800">{metrics.attendance_percentage}%</p>
-                    </div>
                 </div>
 
                 {/* Charts & Recent Scans Section */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                     {/* Weekly Trend Chart (2 cols) */}
-                    <div className="lg:col-span-2 p-5 bg-white rounded-xl border border-gray-200 shadow-sm">
+                    <div className="lg:col-span-2 p-5 bg-white rounded-lg border border-slate-200 shadow-xs">
                         <div className="flex items-center justify-between mb-4">
                             <div>
-                                <h3 className="text-sm font-bold text-gray-900">
-                                    Tren Kehadiran Harian (7 Hari Terakhir)
-                                </h3>
-                                <p className="text-xs text-gray-500">
-                                    Perbandingan siswa hadir tepat, terlambat, izin, dan alpa
+                                <h2 className="text-sm font-semibold text-slate-900">
+                                    Tren Kehadiran (7 Hari Terakhir)
+                                </h2>
+                                <p className="text-xs text-slate-500">
+                                    Perbandingan jumlah siswa hadir, terlambat, izin/sakit, dan alpa
                                 </p>
                             </div>
                         </div>
 
-                        <div className="h-72 w-full">
+                        <div className="h-64 w-full">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={weekly_trend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                                    <YAxis tick={{ fontSize: 11 }} />
+                                <BarChart
+                                    data={weekly_trend}
+                                    margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                                >
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                    <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#64748b' }} stroke="#cbd5e1" />
+                                    <YAxis tick={{ fontSize: 11, fill: '#64748b' }} stroke="#cbd5e1" />
                                     <Tooltip
-                                        contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #ddd', fontSize: '12px' }}
+                                        contentStyle={{
+                                            backgroundColor: '#ffffff',
+                                            borderRadius: '6px',
+                                            border: '1px solid #e2e8f0',
+                                            fontSize: '11px',
+                                            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                                        }}
                                     />
-                                    <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
-                                    <Bar dataKey="hadir" name="Hadir" fill="#14433b" radius={[4, 4, 0, 0]} />
-                                    <Bar dataKey="terlambat" name="Terlambat" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                                    <Bar dataKey="izin_sakit" name="Izin / Sakit" fill="#0284c7" radius={[4, 4, 0, 0]} />
-                                    <Bar dataKey="alpa" name="Alpa" fill="#e11d48" radius={[4, 4, 0, 0]} />
+                                    <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                                    <Bar dataKey="hadir" name="Hadir" fill="#14433b" radius={[2, 2, 0, 0]} />
+                                    <Bar dataKey="terlambat" name="Terlambat" fill="#f59e0b" radius={[2, 2, 0, 0]} />
+                                    <Bar dataKey="izin_sakit" name="Izin / Sakit" fill="#0284c7" radius={[2, 2, 0, 0]} />
+                                    <Bar dataKey="alpa" name="Alpa" fill="#e11d48" radius={[2, 2, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
 
                     {/* Live Recent Scans (1 col) */}
-                    <div className="p-5 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col">
-                        <div className="flex items-center justify-between mb-3">
-                            <h3 className="text-sm font-bold text-gray-900">
-                                Pemindaian Terbaru Hari Ini
-                            </h3>
-                            <Link href="/attendance-history" className="text-xs text-[#14433b] font-semibold hover:underline flex items-center gap-1">
-                                <span>Lihat Semua</span>
-                                <ArrowRight className="w-3 h-3" />
+                    <div className="p-5 bg-white rounded-lg border border-slate-200 shadow-xs flex flex-col">
+                        <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+                            <h2 className="text-sm font-semibold text-slate-900">
+                                Pemindaian Terbaru
+                            </h2>
+                            <Link
+                                href="/attendance-history"
+                                className="text-xs text-[#14433b] hover:underline font-medium flex items-center gap-1"
+                            >
+                                <span>Semua</span>
+                                <ChevronRight className="w-3.5 h-3.5" />
                             </Link>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto divide-y divide-gray-100 max-h-72">
+                        <div className="flex-1 overflow-y-auto divide-y divide-slate-100 max-h-64">
                             {recent_scans.length > 0 ? (
                                 recent_scans.map((scan) => (
-                                    <div key={scan.id} className="py-2.5 flex items-center justify-between text-xs">
+                                    <div
+                                        key={scan.id}
+                                        className="py-2 flex items-center justify-between text-xs"
+                                    >
                                         <div className="min-w-0 pr-2">
-                                            <p className="font-semibold text-gray-900 truncate">{scan.student_name}</p>
-                                            <p className="text-[11px] text-gray-500">
-                                                NIS: {scan.nis} &bull; {scan.class_name}
+                                            <p className="font-medium text-slate-900 truncate">
+                                                {scan.student_name}
+                                            </p>
+                                            <p className="text-[11px] text-slate-500">
+                                                {scan.nis} &bull; {scan.class_name}
                                             </p>
                                         </div>
-                                        <div className="text-right flex-shrink-0">
+                                        <div className="text-right shrink-0">
                                             <StatusBadge status={scan.status} size="sm" />
-                                            <p className="text-[10px] text-gray-400 mt-0.5 font-mono">{scan.time}</p>
+                                            <p className="text-[10px] text-slate-400 mt-0.5 font-mono">
+                                                {scan.time}
+                                            </p>
                                         </div>
                                     </div>
                                 ))
                             ) : (
-                                <div className="py-8 text-center text-xs text-gray-400">
+                                <div className="py-10 text-center text-xs text-slate-400">
                                     Belum ada pemindaian tercatat untuk sesi hari ini.
                                 </div>
                             )}
@@ -286,19 +290,22 @@ export default function Dashboard({
                 </div>
 
                 {/* Class Attendance Summary & Device/CCTV Status */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                     {/* Class Stats Table (2 cols) */}
-                    <div className="lg:col-span-2 p-5 bg-white rounded-xl border border-gray-200 shadow-sm">
-                        <div className="flex items-center justify-between mb-4">
+                    <div className="lg:col-span-2 p-5 bg-white rounded-lg border border-slate-200 shadow-xs">
+                        <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
                             <div>
-                                <h3 className="text-sm font-bold text-gray-900">
+                                <h2 className="text-sm font-semibold text-slate-900">
                                     Statistik Kehadiran per Kelas
-                                </h3>
-                                <p className="text-xs text-gray-500">
-                                    Distribusi siswa hadir hari ini di seluruh 15 rombel kelas
+                                </h2>
+                                <p className="text-xs text-slate-500">
+                                    Rekapitulasi kehadiran di seluruh rombel kelas hari ini
                                 </p>
                             </div>
-                            <Link href="/classroom" className="text-xs text-[#14433b] font-semibold hover:underline">
+                            <Link
+                                href="/classroom"
+                                className="text-xs text-[#14433b] hover:underline font-medium"
+                            >
                                 Konfirmasi Kelas &rarr;
                             </Link>
                         </div>
@@ -306,30 +313,40 @@ export default function Dashboard({
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-xs">
                                 <thead>
-                                    <tr className="border-b border-gray-200 text-gray-500 font-semibold bg-gray-50/50">
-                                        <th className="py-2.5 px-3">Kelas</th>
-                                        <th className="py-2.5 px-3 text-center">Total Siswa</th>
-                                        <th className="py-2.5 px-3 text-center">Hadir</th>
-                                        <th className="py-2.5 px-3 text-center">Terlambat</th>
-                                        <th className="py-2.5 px-3 text-right">Persentase</th>
+                                    <tr className="border-b border-slate-200 text-slate-500 font-medium bg-slate-50/50">
+                                        <th className="py-2 px-3">Kelas</th>
+                                        <th className="py-2 px-3 text-center">Siswa</th>
+                                        <th className="py-2 px-3 text-center">Hadir</th>
+                                        <th className="py-2 px-3 text-center">Terlambat</th>
+                                        <th className="py-2 px-3 text-right">Persentase</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-100">
+                                <tbody className="divide-y divide-slate-100 text-slate-700">
                                     {class_stats.slice(0, 8).map((cls) => (
-                                        <tr key={cls.id} className="hover:bg-gray-50/80 transition-colors">
-                                            <td className="py-2.5 px-3 font-semibold text-gray-900">{cls.name}</td>
-                                            <td className="py-2.5 px-3 text-center text-gray-600">{cls.total_students}</td>
-                                            <td className="py-2.5 px-3 text-center text-emerald-700 font-bold">{cls.present}</td>
-                                            <td className="py-2.5 px-3 text-center text-amber-700 font-medium">{cls.late}</td>
-                                            <td className="py-2.5 px-3 text-right">
+                                        <tr key={cls.id} className="hover:bg-slate-50 transition-colors">
+                                            <td className="py-2 px-3 font-medium text-slate-900">
+                                                {cls.name}
+                                            </td>
+                                            <td className="py-2 px-3 text-center text-slate-600">
+                                                {cls.total_students}
+                                            </td>
+                                            <td className="py-2 px-3 text-center text-emerald-800 font-medium">
+                                                {cls.present}
+                                            </td>
+                                            <td className="py-2 px-3 text-center text-amber-800 font-medium">
+                                                {cls.late}
+                                            </td>
+                                            <td className="py-2 px-3 text-right">
                                                 <div className="flex items-center justify-end gap-2">
-                                                    <div className="w-16 bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                                                    <div className="w-16 bg-slate-100 rounded-full h-1.5 overflow-hidden">
                                                         <div
-                                                            className="bg-[#21c9a4] h-1.5 rounded-full"
-                                                            style={{ width: `${Math.min(100, cls.attendance_rate)}%` }}
+                                                            className="bg-[#14433b] h-1.5 rounded-full"
+                                                            style={{
+                                                                width: `${Math.min(100, cls.attendance_rate)}%`,
+                                                            }}
                                                         />
                                                     </div>
-                                                    <span className="font-bold font-mono text-gray-700 w-10 text-right">
+                                                    <span className="font-mono text-slate-700 w-10 text-right">
                                                         {cls.attendance_rate}%
                                                     </span>
                                                 </div>
@@ -344,62 +361,74 @@ export default function Dashboard({
                     {/* Hardware & CCTV Status Panel (1 col) */}
                     <div className="space-y-4">
                         {/* Scanner Devices Status */}
-                        <div className="p-5 bg-white rounded-xl border border-gray-200 shadow-sm">
-                            <div className="flex items-center justify-between mb-3">
-                                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                                    <Radio className="w-4 h-4 text-[#14433b]" />
+                        <div className="p-4 bg-white rounded-lg border border-slate-200 shadow-xs">
+                            <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-100">
+                                <h2 className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
+                                    <Radio className="w-4 h-4 text-slate-600" />
                                     <span>Perangkat Scanner</span>
-                                </h3>
-                                <Link href="/devices" className="text-[11px] text-[#14433b] font-semibold hover:underline">
+                                </h2>
+                                <Link
+                                    href="/devices"
+                                    className="text-[11px] text-[#14433b] hover:underline font-medium"
+                                >
                                     Kelola
                                 </Link>
                             </div>
 
-                            <div className="space-y-2.5 text-xs">
+                            <div className="space-y-2 text-xs">
                                 {scanner_devices.map((dev) => (
-                                    <div key={dev.id} className="p-2.5 rounded-lg border border-gray-100 bg-gray-50/60 flex items-center justify-between">
+                                    <div
+                                        key={dev.id}
+                                        className="p-2 rounded border border-slate-100 bg-slate-50/60 flex items-center justify-between"
+                                    >
                                         <div className="min-w-0 pr-2">
-                                            <p className="font-semibold text-gray-900 truncate">{dev.device_name}</p>
-                                            <p className="text-[11px] text-gray-500 truncate">{dev.location || 'Pos Scanner'}</p>
+                                            <p className="font-medium text-slate-900 truncate">
+                                                {dev.device_name}
+                                            </p>
+                                            <p className="text-[10px] text-slate-500 truncate">
+                                                {dev.location || 'Pos Scanner'}
+                                            </p>
                                         </div>
-                                        <div className="text-right flex-shrink-0">
-                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
-                                                dev.is_online ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-700'
-                                            }`}>
-                                                {dev.is_online ? 'ONLINE' : 'STANDBY'}
-                                            </span>
-                                        </div>
+                                        <span
+                                            className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                                dev.is_online
+                                                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                                    : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                            }`}
+                                        >
+                                            {dev.is_online ? 'Online' : 'Standby'}
+                                        </span>
                                     </div>
                                 ))}
                             </div>
                         </div>
 
                         {/* CCTV Integration Status */}
-                        <div className="p-5 bg-white rounded-xl border border-gray-200 shadow-sm">
-                            <div className="flex items-center justify-between mb-2">
-                                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                                    <Camera className="w-4 h-4 text-[#14433b]" />
-                                    <span>Integrasi CCTV EZVIZ H8c</span>
-                                </h3>
-                                <Link href="/cctv" className="text-[11px] text-[#14433b] font-semibold hover:underline">
+                        <div className="p-4 bg-white rounded-lg border border-slate-200 shadow-xs">
+                            <div className="flex items-center justify-between mb-2 pb-2 border-b border-slate-100">
+                                <h2 className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
+                                    <Camera className="w-4 h-4 text-slate-600" />
+                                    <span>Integrasi CCTV (EZVIZ)</span>
+                                </h2>
+                                <Link
+                                    href="/cctv"
+                                    className="text-[11px] text-[#14433b] hover:underline font-medium"
+                                >
                                     Detail
                                 </Link>
                             </div>
 
-                            <p className="text-xs text-gray-500 mb-3">
-                                Perangkat pendukung rekaman audit video gerbang sekolah
+                            <p className="text-[11px] text-slate-500 mb-2">
+                                Kamera pemantauan gerbang untuk dokumentasi visual
                             </p>
 
-                            <div className="p-3 rounded-lg border border-amber-200 bg-amber-50/50 text-xs space-y-1">
-                                <div className="flex items-center justify-between">
-                                    <span className="font-semibold text-amber-900">Status Modul:</span>
-                                    <span className="px-2 py-0.5 rounded bg-amber-200 text-amber-900 font-bold text-[10px]">
-                                        OPSIONAL
-                                    </span>
-                                </div>
-                                <p className="text-[11px] text-amber-800 leading-snug pt-1">
+                            <div className="p-2.5 rounded border border-slate-200 bg-slate-50 text-xs flex items-center justify-between">
+                                <span className="text-slate-600 text-[11px]">
                                     {cctv_status.status_label}
-                                </p>
+                                </span>
+                                <span className="text-[10px] text-slate-500 font-mono">
+                                    Opsional
+                                </span>
                             </div>
                         </div>
                     </div>

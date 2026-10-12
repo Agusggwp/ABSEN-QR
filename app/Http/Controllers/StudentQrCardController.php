@@ -83,14 +83,8 @@ class StudentQrCardController extends Controller
 
     public function printSingle(Student $student): SymfonyResponse
     {
-        $qrCode = $student->activeQrCode;
-        if (!$qrCode) {
-            $generated = $this->qrSecurityService->generateTokenForStudent($student);
-            $rawToken = $generated['raw_secret_token'];
-        } else {
-            // Gunakan masked token atau regenerate jika raw token tidak tersimpan
-            $rawToken = "ARTDEVATA-SEC-{$student->nis}-{$qrCode->card_number}";
-        }
+        $tokenData = $this->qrSecurityService->getActiveTokenForStudent($student);
+        $rawToken = $tokenData['raw_secret_token'];
 
         return $this->pdfService->generateSingleStudentCard($student, $rawToken);
     }
@@ -107,14 +101,11 @@ class StudentQrCardController extends Controller
         $students = $query->take(30)->get(); // Cetak per halaman/batch 30 kartu
 
         $cardsData = $students->map(function ($std) {
-            $qr = $std->activeQrCode;
-            $cardNumber = $qr?->card_number ?? ('KARTU-' . str_pad((string) $std->id, 5, '0', STR_PAD_LEFT));
-            $token = "ARTDEVATA-SEC-{$std->nis}-{$cardNumber}";
-
+            $tokenData = $this->qrSecurityService->getActiveTokenForStudent($std);
             return [
                 'student' => $std,
-                'card_number' => $cardNumber,
-                'qr_token' => $token,
+                'card_number' => $tokenData['qr_code']->card_number,
+                'qr_token' => $tokenData['raw_secret_token'],
             ];
         })->toArray();
 

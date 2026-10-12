@@ -20,8 +20,12 @@ class DashboardController extends Controller
         protected EzvizCctvService $cctvService
     ) {}
 
-    public function index(Request $request): Response
+    public function index(Request $request): Response|\Illuminate\Http\RedirectResponse
     {
+        if ($request->user()->isMurid()) {
+            return redirect()->route('portal.dashboard');
+        }
+
         $today = now()->format('Y-m-d');
         $session = AttendanceSession::where('date', $today)->where('type', 'masuk')->first();
 

@@ -99,6 +99,7 @@ class StudentAndQrSeeder extends Seeder
             $qrCodesData[] = [
                 'student_id' => $studentId,
                 'qr_token_hash' => $tokenHash,
+                'qr_token_encrypted' => \Illuminate\Support\Facades\Crypt::encryptString($rawToken),
                 'raw_token_masked' => $masked,
                 'card_number' => $cardNumber,
                 'status' => 'active',

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import Pagination from '@/Components/Pagination';
 import StatusBadge from '@/Components/StatusBadge';
@@ -11,6 +11,10 @@ import {
     Trash2,
     X,
     Calendar,
+    User,
+    Check,
+    CheckCircle2,
+    GraduationCap,
 } from 'lucide-react';
 import { SchoolClass } from '@/types';
 
@@ -30,6 +34,14 @@ interface ExceptionItem {
     approved_by_user?: { name: string } | null;
 }
 
+interface StudentOption {
+    id: number;
+    name: string;
+    nis: string;
+    class_id?: number | null;
+    school_class?: { name: string } | null;
+}
+
 interface ExceptionsIndexProps {
     exceptions: {
         data: ExceptionItem[];
@@ -46,47 +58,113 @@ interface ExceptionsIndexProps {
 export default function ExceptionsIndex({ exceptions, classes, filters }: ExceptionsIndexProps) {
     const [search, setSearch] = useState(filters.search || '');
     const [category, setCategory] = useState(filters.category || 'all');
+    const isFirstRender = useRef(true);
 
-    // Add Modal
+    // Debounced search & filter without loading bar
+    useEffect(() => {
+        if (isFirstRender.current) {
+            isFirstRender.current = false;
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            router.get(
+                '/exceptions',
+                { search, category },
+                { preserveState: true, preserveScroll: true, replace: true, showProgress: false }
+            );
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [search, category]);
+
+    // Add Modal State
     const [modalOpen, setModalOpen] = useState(false);
-    const [nisInput, setNisInput] = useState('');
-    const [studentSearchResult, setStudentSearchResult] = useState<any>(null);
+    const [selectedStudent, setSelectedStudent] = useState<StudentOption | null>(null);
+    const [studentSearchQuery, setStudentSearchQuery] = useState('');
+    const [studentSearchClassId, setStudentSearchClassId] = useState('');
+    const [studentSearchResults, setStudentSearchResults] = useState<StudentOption[]>([]);
+    const [isSearchingStudents, setIsSearchingStudents] = useState(false);
+    const [studentError, setStudentError] = useState<string | null>(null);
+
     const [formCategory, setFormCategory] = useState<'izin' | 'sakit' | 'dispensasi'>('izin');
     const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
     const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10));
     const [reason, setReason] = useState('');
     const [isSaving, setIsSaving] = useState(false);
 
-    const handleFilterSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        router.get('/exceptions', { search, category }, { preserveState: true, replace: true });
+    // Fetch students dynamically for modal picker
+    const fetchStudents = async (query: string, clsId: string) => {
+        setIsSearchingStudents(true);
+        try {
+            const res = await fetch(
+                `/exceptions/students/search?q=${encodeURIComponent(query)}&class_id=${encodeURIComponent(clsId)}`,
+                { headers: { Accept: 'application/json' } }
+            );
+            if (res.ok) {
+                const data = await res.json();
+                setStudentSearchResults(data);
+            }
+        } catch (err) {
+            console.error('Failed to search students:', err);
+        } finally {
+            setIsSearchingStudents(false);
+        }
     };
 
-    const handleSearchStudent = async () => {
-        if (!nisInput.trim()) return;
-        try {
-            const res = await fetch(`/students?search=${nisInput.trim()}&per_page=1`, {
-                headers: { Accept: 'application/json' },
-            });
-            // Let's use simple prompt or allow direct student_id selection
-        } catch (e) {}
+    // When modal opens, load initial student list
+    useEffect(() => {
+        if (modalOpen) {
+            fetchStudents(studentSearchQuery, studentSearchClassId);
+        }
+    }, [modalOpen]);
+
+    // Live search within modal when typing query or changing class filter
+    useEffect(() => {
+        if (!modalOpen) return;
+        const timer = setTimeout(() => {
+            fetchStudents(studentSearchQuery, studentSearchClassId);
+        }, 200);
+        return () => clearTimeout(timer);
+    }, [studentSearchQuery, studentSearchClassId]);
+
+    const handleFilterSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        router.get(
+            '/exceptions',
+            { search, category },
+            { preserveState: true, preserveScroll: true, replace: true, showProgress: false }
+        );
     };
 
     const handleFormSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (!selectedStudent) {
+            setStudentError('Pilih siswa terlebih dahulu dari daftar pencarian.');
+            return;
+        }
+
+        setStudentError(null);
         setIsSaving(true);
 
         router.post(
             '/exceptions',
             {
-                student_id: 1, // Will bind properly from selection
+                student_id: selectedStudent.id,
                 category: formCategory,
                 start_date: startDate,
                 end_date: endDate,
                 reason,
             },
             {
-                onSuccess: () => setModalOpen(false),
+                preserveScroll: true,
+                onSuccess: () => {
+                    setModalOpen(false);
+                    setSelectedStudent(null);
+                    setStudentSearchQuery('');
+                    setStudentSearchClassId('');
+                    setReason('');
+                },
                 onFinish: () => setIsSaving(false),
             }
         );
@@ -94,7 +172,7 @@ export default function ExceptionsIndex({ exceptions, classes, filters }: Except
 
     const handleDelete = (item: ExceptionItem) => {
         if (confirm(`Hapus catatan ${item.category} untuk siswa "${item.student?.name}"?`)) {
-            router.delete(`/exceptions/${item.id}`);
+            router.delete(`/exceptions/${item.id}`, { preserveScroll: true });
         }
     };
 
@@ -142,7 +220,7 @@ export default function ExceptionsIndex({ exceptions, classes, filters }: Except
                             <select
                                 value={category}
                                 onChange={(e) => setCategory(e.target.value)}
-                                className="w-full py-2 px-3 text-xs rounded-lg border-gray-300 focus:ring-[#21c9a4] focus:border-[#21c9a4]"
+                                className="w-full py-2 pl-3 pr-8 text-xs rounded-lg border-gray-300 focus:ring-[#21c9a4] focus:border-[#21c9a4] bg-white"
                             >
                                 <option value="all">Semua Kategori</option>
                                 <option value="izin">Izin</option>
@@ -248,6 +326,114 @@ export default function ExceptionsIndex({ exceptions, classes, filters }: Except
                         </div>
 
                         <form onSubmit={handleFormSubmit} className="space-y-4 text-xs">
+                            {/* Pemilihan Siswa */}
+                            <div>
+                                <label className="block font-semibold text-gray-700 mb-1">
+                                    Pilih Siswa: <span className="text-rose-500">*</span>
+                                </label>
+
+                                {studentError && (
+                                    <div className="mb-2 p-2 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-xs">
+                                        {studentError}
+                                    </div>
+                                )}
+
+                                {selectedStudent ? (
+                                    <div className="flex items-center justify-between p-3 bg-emerald-50/80 border border-emerald-300 rounded-xl">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-emerald-700 text-white flex items-center justify-center font-bold text-xs">
+                                                {selectedStudent.name.charAt(0)}
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-gray-900 text-xs flex items-center gap-1.5">
+                                                    <span>{selectedStudent.name}</span>
+                                                    <span className="text-[10px] bg-emerald-200/80 text-emerald-800 font-semibold px-1.5 py-0.5 rounded">
+                                                        Terpilih
+                                                    </span>
+                                                </div>
+                                                <div className="text-[11px] text-gray-500 font-mono">
+                                                    NIS: {selectedStudent.nis} • Kelas: {selectedStudent.school_class?.name || '-'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedStudent(null)}
+                                            className="px-2.5 py-1 text-xs font-semibold text-emerald-800 bg-white border border-emerald-300 hover:bg-emerald-100 rounded-lg transition-colors"
+                                        >
+                                            Ganti Siswa
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                                            <div className="sm:col-span-8 relative">
+                                                <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-gray-400" />
+                                                <input
+                                                    type="text"
+                                                    value={studentSearchQuery}
+                                                    onChange={(e) => setStudentSearchQuery(e.target.value)}
+                                                    placeholder="Cari nama atau NIS siswa..."
+                                                    className="w-full pl-8 pr-2 py-1.5 text-xs rounded-lg border-gray-300 focus:ring-[#21c9a4] focus:border-[#21c9a4]"
+                                                    autoFocus
+                                                />
+                                            </div>
+                                            <div className="sm:col-span-4">
+                                                <select
+                                                    value={studentSearchClassId}
+                                                    onChange={(e) => setStudentSearchClassId(e.target.value)}
+                                                    className="w-full py-1.5 pl-2 pr-6 text-xs rounded-lg border-gray-300 focus:ring-[#21c9a4] focus:border-[#21c9a4] bg-white"
+                                                >
+                                                    <option value="">Semua Kelas</option>
+                                                    {classes.map((cls) => (
+                                                        <option key={cls.id} value={cls.id}>
+                                                            {cls.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        {/* Dropdown Hasil Pencarian Siswa */}
+                                        <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100 bg-gray-50/50">
+                                            {isSearchingStudents ? (
+                                                <div className="p-3 text-center text-gray-400 text-xs">
+                                                    Mencari data siswa...
+                                                </div>
+                                            ) : studentSearchResults.length > 0 ? (
+                                                studentSearchResults.map((st) => (
+                                                    <button
+                                                        key={st.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setSelectedStudent(st);
+                                                            setStudentError(null);
+                                                        }}
+                                                        className="w-full text-left p-2 hover:bg-emerald-50 transition-colors flex items-center justify-between group"
+                                                    >
+                                                        <div>
+                                                            <div className="font-semibold text-gray-800 text-xs group-hover:text-emerald-800">
+                                                                {st.name}
+                                                            </div>
+                                                            <div className="text-[10px] text-gray-500 font-mono">
+                                                                NIS: {st.nis} • Kelas: {st.school_class?.name || '-'}
+                                                            </div>
+                                                        </div>
+                                                        <span className="text-[11px] font-semibold text-[#14433b] opacity-0 group-hover:opacity-100 px-2 py-0.5 bg-emerald-100 rounded">
+                                                            Pilih
+                                                        </span>
+                                                    </button>
+                                                ))
+                                            ) : (
+                                                <div className="p-3 text-center text-gray-400 text-xs">
+                                                    Tidak ada siswa yang sesuai.
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
                             <div>
                                 <label className="block font-semibold text-gray-700 mb-1">
                                     Pilih Kategori: <span className="text-rose-500">*</span>

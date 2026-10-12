@@ -128,12 +128,29 @@
             <div class="card-wrapper">
                 <div class="card-inner">
                     <div class="card-header">
+                        @if(!empty($logoPath) && file_exists(public_path('storage/' . $logoPath)))
+                            <img src="{{ public_path('storage/' . $logoPath) }}" style="float: left; width: 5.5mm; height: 5.5mm; object-fit: contain; margin-right: 2mm; background: #ffffff; padding: 0.4mm; border-radius: 2px;">
+                        @endif
                         <div class="school-title">{{ $schoolName ?? 'SMA ARTDEVATA DENPASAR' }}</div>
                         <div class="school-subtitle">KARTU ABSENSI RESMI SISWA</div>
                     </div>
                     <div class="card-body clearfix">
                         <div class="photo-box">
-                            <div class="photo-placeholder">FOTO</div>
+                            @php
+                                $cPhoto = null;
+                                if (!empty($c['student']->photo_path)) {
+                                    if (file_exists(public_path('storage/' . $c['student']->photo_path))) {
+                                        $cPhoto = public_path('storage/' . $c['student']->photo_path);
+                                    } elseif (file_exists(public_path($c['student']->photo_path))) {
+                                        $cPhoto = public_path($c['student']->photo_path);
+                                    }
+                                }
+                            @endphp
+                            @if($cPhoto)
+                                <img src="{{ $cPhoto }}" alt="Foto" style="width: 100%; height: 100%; object-fit: cover;">
+                            @else
+                                <div class="photo-placeholder">FOTO</div>
+                            @endif
                         </div>
                         <div class="student-info">
                             <div class="info-label">Nama</div>

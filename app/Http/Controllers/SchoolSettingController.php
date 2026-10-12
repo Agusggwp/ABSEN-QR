@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\SchoolSetting;
 use App\Models\AuditLog;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Http\RedirectResponse;
@@ -25,6 +26,7 @@ class SchoolSettingController extends Controller
             'headmaster_nip' => SchoolSetting::get('headmaster_nip', '197505122000032001'),
             'anti_titip_require_officer_confirm' => SchoolSetting::get('anti_titip_require_officer_confirm', '1'),
             'late_tolerance_minutes' => SchoolSetting::get('late_tolerance_minutes', '15'),
+            'logo_path' => SchoolSetting::get('logo_path', null),
         ];
 
         return Inertia::render('Settings/Index', [
@@ -46,14 +48,37 @@ class SchoolSettingController extends Controller
             'headmaster_nip' => 'nullable|string|max:30',
             'anti_titip_require_officer_confirm' => 'required|in:0,1',
             'late_tolerance_minutes' => 'required|integer|min:0|max:120',
+            'logo' => 'nullable|image|mimes:jpeg,png,jpg,webp,svg|max:2048',
+            'remove_logo' => 'nullable|in:0,1,true,false',
         ]);
+
+        // Tangani penghapusan atau upload logo baru
+        if ($request->boolean('remove_logo')) {
+            $oldLogo = SchoolSetting::get('logo_path');
+            if ($oldLogo && Storage::disk('public')->exists($oldLogo)) {
+                Storage::disk('public')->delete($oldLogo);
+            }
+            SchoolSetting::set('logo_path', null);
+        } elseif ($request->hasFile('logo')) {
+            $oldLogo = SchoolSetting::get('logo_path');
+            if ($oldLogo && Storage::disk('public')->exists($oldLogo)) {
+                Storage::disk('public')->delete($oldLogo);
+            }
+            $storedPath = $request->file('logo')->store('logos', 'public');
+            SchoolSetting::set('logo_path', $storedPath);
+        }
+
+        unset($validated['logo'], $validated['remove_logo']);
 
         foreach ($validated as $key => $value) {
             SchoolSetting::set($key, (string) $value);
         }
 
-        AuditLog::log('school_settings.updated', 'SchoolSetting', null, null, $validated);
+        AuditLog::log('school_settings.updated', 'SchoolSetting', null, null, [
+            ...$validated,
+            'has_logo_change' => $request->hasFile('logo') || $request->boolean('remove_logo'),
+        ]);
 
-        return redirect()->back()->with('success', 'Pengaturan sekolah berhasil diperbarui.');
+        return redirect()->back()->with('success', 'Pengaturan sekolah dan logo berhasil diperbarui.');
     }
 }

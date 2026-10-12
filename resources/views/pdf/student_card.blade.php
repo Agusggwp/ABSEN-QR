@@ -119,13 +119,26 @@
 <body>
     <div class="card-container">
         <div class="card-header">
+            @if(!empty($logoPath) && file_exists(public_path('storage/' . $logoPath)))
+                <img src="{{ public_path('storage/' . $logoPath) }}" style="float: left; width: 6.5mm; height: 6.5mm; object-fit: contain; margin-right: 2.5mm; background: #ffffff; padding: 0.5mm; border-radius: 2px;">
+            @endif
             <div class="school-title">{{ $schoolName ?? 'SMA ARTDEVATA DENPASAR' }}</div>
             <div class="school-subtitle">KARTU TANDA SISWA & ABSENSI RESMI</div>
         </div>
         <div class="card-body">
             <div class="photo-box">
-                @if(!empty($student->photo_path) && file_exists(public_path($student->photo_path)))
-                    <img src="{{ public_path($student->photo_path) }}" alt="Foto">
+                @php
+                    $studentPhoto = null;
+                    if (!empty($student->photo_path)) {
+                        if (file_exists(public_path('storage/' . $student->photo_path))) {
+                            $studentPhoto = public_path('storage/' . $student->photo_path);
+                        } elseif (file_exists(public_path($student->photo_path))) {
+                            $studentPhoto = public_path($student->photo_path);
+                        }
+                    }
+                @endphp
+                @if($studentPhoto)
+                    <img src="{{ $studentPhoto }}" alt="Foto">
                 @else
                     <div class="photo-placeholder">FOTO 3x4</div>
                 @endif

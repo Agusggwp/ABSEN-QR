@@ -20,7 +20,8 @@ class AttendanceScannerController extends Controller
 
     public function index(Request $request): Response
     {
-        $today = now()->format('Y-m-d');
+        $timezone = \App\Models\SchoolSetting::get('timezone', config('app.timezone', 'Asia/Makassar'));
+        $today = now()->timezone($timezone)->format('Y-m-d');
         $session = $this->attendanceService->getTodayActiveSession();
 
         $devices = ScannerDevice::where('is_active', true)->get();
@@ -31,9 +32,9 @@ class AttendanceScannerController extends Controller
             ? Attendance::with(['student.schoolClass', 'verifiedByUser'])
                 ->where('session_id', $session->id)
                 ->latest('scanned_at')
-                ->take(15)
+                ->take(20)
                 ->get()
-                ->map(function ($att) {
+                ->map(function ($att) use ($timezone) {
                     return [
                         'id' => $att->id,
                         'student_id' => $att->student_id,
@@ -41,8 +42,32 @@ class AttendanceScannerController extends Controller
                         'nis' => $att->student?->nis ?? '-',
                         'class_name' => $att->schoolClass?->name ?? '-',
                         'status' => $att->status,
-                        'time' => Carbon::parse($att->scanned_at)->format('H:i:s'),
+                        'time' => Carbon::parse($att->scanned_at)->timezone($timezone)->format('H:i:s'),
                         'officer_name' => $att->verifiedByUser?->name ?? 'Petugas',
+                    ];
+                })
+            : [];
+
+        // Data siswa aktif untuk quick simulator di Mode Dev (Khusus Super Admin)
+        $isSuperAdmin = auth()->user()?->isSuperAdmin() ?? false;
+        $devStudents = $isSuperAdmin
+            ? \App\Models\Student::with(['schoolClass', 'activeQrCode'])
+                ->where('is_active', true)
+                ->take(150)
+                ->get()
+                ->map(function ($s) {
+                    $token = $s->activeQrCode?->getDecryptedToken();
+                    if (!$token) {
+                        $tokenData = app(\App\Services\QrSecurityService::class)->getActiveTokenForStudent($s);
+                        $token = $tokenData['raw_secret_token'];
+                    }
+                    return [
+                        'id' => $s->id,
+                        'name' => $s->name,
+                        'nis' => $s->nis,
+                        'class_name' => $s->schoolClass?->name ?? '-',
+                        'photo_path' => $s->photo_path,
+                        'token' => $token,
                     ];
                 })
             : [];
@@ -60,9 +85,11 @@ class AttendanceScannerController extends Controller
             'devices' => $devices,
             'default_device_id' => $defaultDeviceId,
             'recent_scans' => $recentScans,
+            'dev_students' => $devStudents,
+            'is_super_admin' => $isSuperAdmin,
             'attendance_settings' => \App\Models\AttendanceSetting::getSettings()->load('activeCamera'),
-            'server_clock' => now()->format('H:i:s'),
-            'server_date' => now()->translatedFormat('l, d F Y'),
+            'server_clock' => now()->timezone($timezone)->format('H:i:s'),
+            'server_date' => now()->timezone($timezone)->translatedFormat('l, d F Y'),
         ]);
     }
 
@@ -75,13 +102,15 @@ class AttendanceScannerController extends Controller
             'qr_token' => 'required|string',
             'device_id' => 'required|exists:scanner_devices,id',
             'session_id' => 'nullable|exists:attendance_sessions,id',
+            'dev_mode' => 'nullable|boolean',
         ]);
 
         $rawToken = $request->input('qr_token');
         $deviceId = (int) $request->input('device_id');
         $sessionId = $request->input('session_id') ? (int) $request->input('session_id') : null;
+        $isDevMode = (bool) $request->input('dev_mode', false);
 
-        $result = $this->attendanceService->preScanVerify($rawToken, $deviceId, $sessionId);
+        $result = $this->attendanceService->preScanVerify($rawToken, $deviceId, $sessionId, $isDevMode);
 
         return response()->json($result);
     }
@@ -98,9 +127,12 @@ class AttendanceScannerController extends Controller
             'qr_code_id' => 'nullable|exists:student_qr_codes,id',
             'status' => 'nullable|in:hadir,terlambat,perlu_verifikasi',
             'notes' => 'nullable|string|max:255',
+            'dev_mode' => 'nullable|boolean',
         ]);
 
         try {
+            $isDevMode = (bool) $request->input('dev_mode', false);
+
             $result = $this->attendanceService->confirmAttendance(
                 studentId: (int) $request->input('student_id'),
                 sessionId: (int) $request->input('session_id'),
@@ -108,7 +140,8 @@ class AttendanceScannerController extends Controller
                 officerUserId: auth()->id(),
                 qrCodeId: $request->input('qr_code_id'),
                 customStatus: $request->input('status'),
-                notes: $request->input('notes')
+                notes: $request->input('notes'),
+                isDevMode: $isDevMode
             );
 
             return response()->json($result);
@@ -145,5 +178,76 @@ class AttendanceScannerController extends Controller
         );
 
         return response()->json($result);
+    }
+
+    /**
+     * Dev Mode API: Buka atau tutup sesi secara instan (Khusus Super Admin).
+     */
+    public function devToggleSession(Request $request): JsonResponse
+    {
+        abort_unless(auth()->user()->isSuperAdmin(), 403, 'Akses terbatas untuk Super Admin.');
+
+        $session = $this->attendanceService->getTodayActiveSession();
+        if (!$session) {
+            return response()->json(['success' => false, 'message' => 'Gagal membuat sesi hari ini.'], 400);
+        }
+
+        $newStatus = ($session->status === 'open') ? 'closed' : 'open';
+        $session->update(['status' => $newStatus]);
+
+        return response()->json([
+            'success' => true,
+            'status' => $newStatus,
+            'message' => "Sesi absensi sekarang: {$newStatus}",
+            'session' => $session->fresh(),
+        ]);
+    }
+
+    /**
+     * Dev Mode API: Reset semua absensi hari ini agar bisa tes dari nol (Khusus Super Admin).
+     */
+    public function devResetToday(Request $request): JsonResponse
+    {
+        abort_unless(auth()->user()->isSuperAdmin(), 403, 'Akses terbatas untuk Super Admin.');
+
+        $request->validate([
+            'session_id' => 'required|exists:attendance_sessions,id',
+        ]);
+
+        $sessionId = (int) $request->input('session_id');
+        $deletedCount = $this->attendanceService->devResetTodayAttendance($sessionId);
+
+        return response()->json([
+            'success' => true,
+            'deleted_count' => $deletedCount,
+            'message' => "Berhasil mereset {$deletedCount} data absensi hari ini.",
+        ]);
+    }
+
+    /**
+     * Dev Mode API: Simulasi burst scan acak (misal 5 siswa) (Khusus Super Admin).
+     */
+    public function devBurstScan(Request $request): JsonResponse
+    {
+        abort_unless(auth()->user()->isSuperAdmin(), 403, 'Akses terbatas untuk Super Admin.');
+
+        $request->validate([
+            'session_id' => 'required|exists:attendance_sessions,id',
+            'device_id' => 'required|exists:scanner_devices,id',
+            'count' => 'nullable|integer|min:1|max:20',
+        ]);
+
+        $sessionId = (int) $request->input('session_id');
+        $deviceId = (int) $request->input('device_id');
+        $count = (int) $request->input('count', 5);
+
+        $results = $this->attendanceService->devBurstScan($sessionId, $deviceId, auth()->id(), $count);
+
+        return response()->json([
+            'success' => true,
+            'count' => count($results),
+            'scans' => $results,
+            'message' => "Berhasil mensimulasikan " . count($results) . " absensi siswa.",
+        ]);
     }
 }

@@ -21,5 +21,15 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Vite::prefetch(concurrency: 3);
+
+        try {
+            $tz = \App\Models\SchoolSetting::get('timezone', config('app.timezone', 'Asia/Makassar'));
+            if ($tz) {
+                date_default_timezone_set($tz);
+                config(['app.timezone' => $tz]);
+            }
+        } catch (\Throwable $e) {
+            // Abaikan saat migration atau instalasi awal sebelum tabel dibuat
+        }
     }
 }

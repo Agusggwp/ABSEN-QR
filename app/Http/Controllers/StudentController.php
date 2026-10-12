@@ -9,6 +9,7 @@ use App\Models\ClassMembership;
 use App\Models\AuditLog;
 use App\Services\QrSecurityService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Http\RedirectResponse;
@@ -70,20 +71,37 @@ class StudentController extends Controller
             'gender' => 'required|in:L,P',
             'class_id' => 'required|exists:classes,id',
             'notes' => 'nullable|string',
+            'photo' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
         ], [
             'nis.unique' => 'NIS sudah digunakan oleh siswa lain.',
             'nisn.unique' => 'NISN sudah digunakan oleh siswa lain.',
             'name.required' => 'Nama lengkap siswa wajib diisi.',
             'class_id.required' => 'Pilih kelas siswa.',
+            'photo.image' => 'File harus berupa gambar.',
+            'photo.max' => 'Ukuran foto maksimal 2MB.',
         ]);
 
+        $photoPath = null;
+        if ($request->hasFile('photo')) {
+            $photoPath = $request->file('photo')->store('students/photos', 'public');
+        }
+
         $student = Student::create([
-            ...$validated,
+            'nis' => $validated['nis'],
+            'nisn' => $validated['nisn'] ?? null,
+            'name' => $validated['name'],
+            'gender' => $validated['gender'],
+            'class_id' => $validated['class_id'],
+            'notes' => $validated['notes'] ?? null,
+            'photo_path' => $photoPath,
             'is_active' => true,
         ]);
 
         // Buat kartu QR otomatis
         $this->qrSecurityService->generateTokenForStudent($student);
+
+        // Buat akun login murid otomatis
+        app(\App\Services\StudentAccountService::class)->createAccountForStudent($student);
 
         // Catat keanggotaan kelas
         ClassMembership::create([
@@ -114,12 +132,38 @@ class StudentController extends Controller
             'class_id' => 'required|exists:classes,id',
             'is_active' => 'required|boolean',
             'notes' => 'nullable|string',
+            'photo' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
+            'remove_photo' => 'nullable|boolean',
+        ], [
+            'photo.image' => 'File harus berupa gambar.',
+            'photo.max' => 'Ukuran foto maksimal 2MB.',
         ]);
 
-        $oldData = $student->only(['nis', 'name', 'class_id', 'is_active']);
+        if ($request->hasFile('photo')) {
+            if ($student->photo_path && Storage::disk('public')->exists($student->photo_path)) {
+                Storage::disk('public')->delete($student->photo_path);
+            }
+            $student->photo_path = $request->file('photo')->store('students/photos', 'public');
+        } elseif ($request->boolean('remove_photo')) {
+            if ($student->photo_path && Storage::disk('public')->exists($student->photo_path)) {
+                Storage::disk('public')->delete($student->photo_path);
+            }
+            $student->photo_path = null;
+        }
+
+        $oldData = $student->only(['nis', 'name', 'class_id', 'is_active', 'photo_path']);
         $oldClassId = $student->class_id;
 
-        $student->update($validated);
+        $student->fill([
+            'nis' => $validated['nis'],
+            'nisn' => $validated['nisn'] ?? null,
+            'name' => $validated['name'],
+            'gender' => $validated['gender'],
+            'class_id' => $validated['class_id'],
+            'is_active' => $validated['is_active'],
+            'notes' => $validated['notes'] ?? null,
+        ]);
+        $student->save();
 
         // Jika pindah kelas, catat mutasi kelas tanpa merusak riwayat
         if ($oldClassId != $validated['class_id']) {

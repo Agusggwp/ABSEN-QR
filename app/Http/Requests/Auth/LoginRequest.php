@@ -28,7 +28,8 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email'],
+            'login' => ['sometimes', 'string'],
+            'email' => ['sometimes', 'string'],
             'password' => ['required', 'string'],
         ];
     }
@@ -42,11 +43,39 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        $loginInput = $this->input('login') ?? $this->input('email');
+        if (!$loginInput) {
+            throw ValidationException::withMessages([
+                'email' => 'Email atau NIS / Username wajib diisi.',
+            ]);
+        }
+
+        $fieldType = filter_var($loginInput, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
+
+        $user = \App\Models\User::where($fieldType, $loginInput)->first();
+
+        if (!$user && $fieldType === 'username') {
+            $user = \App\Models\User::where('email', $loginInput . '@student.artdevata.sch.id')->first();
+            if ($user) {
+                $fieldType = 'email';
+                $loginInput = $user->email;
+            }
+        }
+
+        if (!$user || !Auth::attempt([$fieldType => $loginInput, 'password' => $this->input('password')], $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
+                'email' => 'Kredensial yang diberikan tidak cocok dengan data kami.',
+            ]);
+        }
+
+        if (!$user->is_active) {
+            Auth::logout();
+            RateLimiter::hit($this->throttleKey());
+
+            throw ValidationException::withMessages([
+                'email' => 'Akun Anda sedang dinonaktifkan. Silakan hubungi pihak sekolah.',
             ]);
         }
 
@@ -81,6 +110,7 @@ class LoginRequest extends FormRequest
      */
     public function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->string('email')).'|'.$this->ip());
+        $loginInput = $this->input('login') ?? $this->input('email') ?? '';
+        return Str::transliterate(Str::lower($loginInput).'|'.$this->ip());
     }
 }

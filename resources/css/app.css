@@ -1,3 +1,11 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+    select {
+        padding-right: 2.25rem !important;
+        background-position: right 0.5rem center !important;
+    }
+}
+

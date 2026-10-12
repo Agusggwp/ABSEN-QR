@@ -91,24 +91,24 @@ export default function StudentImport() {
     };
 
     return (
-        <AuthenticatedLayout title="Impor Data Siswa dari Excel">
+        <AuthenticatedLayout title="Impor Data Siswa">
             <Head title="Impor Siswa Excel" />
 
-            <div className="space-y-6">
+            <div className="space-y-5">
                 {/* Header Back & Download Template */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-white rounded-xl border border-gray-200 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-white rounded-lg border border-slate-200">
                     <div className="flex items-center gap-3">
                         <Link
                             href="/students"
-                            className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
+                            className="p-1.5 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
                         >
                             <ArrowLeft className="w-4 h-4" />
                         </Link>
                         <div>
-                            <h2 className="text-base font-bold text-gray-900">
-                                Impor Massal Siswa Baru
+                            <h2 className="text-sm font-semibold text-slate-900">
+                                Impor data siswa dari spreadsheet
                             </h2>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-slate-500">
                                 Unggah file Excel (.xlsx) atau CSV dengan validasi baris per baris sebelum disimpan
                             </p>
                         </div>
@@ -116,22 +116,22 @@ export default function StudentImport() {
 
                     <a
                         href="/students/import/template"
-                        className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-colors shadow-sm"
+                        className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 transition-colors"
                     >
-                        <Download className="w-4 h-4 text-emerald-600" />
-                        <span>Unduh Template Excel</span>
+                        <Download className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Unduh template Excel</span>
                     </a>
                 </div>
 
                 {/* File Upload Arena */}
-                <div className="p-6 bg-white rounded-xl border border-gray-200 shadow-sm">
+                <div className="p-5 bg-white rounded-lg border border-slate-200">
                     <form onSubmit={handleUploadPreview} className="space-y-4">
-                        <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-[#21c9a4] transition-colors bg-gray-50/50">
-                            <UploadCloud className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-                            <p className="text-xs font-semibold text-gray-700">
-                                {file ? `File Terpilih: ${file.name}` : 'Pilih file Excel (.xlsx / .xls / .csv)'}
+                        <div className="border border-dashed border-slate-300 rounded-lg p-7 text-center hover:border-slate-400 transition-colors bg-slate-50/50">
+                            <UploadCloud className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                            <p className="text-xs font-medium text-slate-800">
+                                {file ? `File terpilih: ${file.name}` : 'Pilih file Excel (.xlsx / .xls / .csv)'}
                             </p>
-                            <p className="text-[11px] text-gray-500 mt-1">
+                            <p className="text-[11px] text-slate-500 mt-0.5">
                                 Pastikan format kolom mengikuti template resmi yang telah diunduh di atas.
                             </p>
                             <input
@@ -143,16 +143,16 @@ export default function StudentImport() {
                             />
                             <label
                                 htmlFor="excel-file-input"
-                                className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-[#14433b] text-white hover:bg-[#1b554b] cursor-pointer shadow-sm"
+                                className="mt-3.5 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-[#14433b] text-white hover:bg-[#1b554b] cursor-pointer"
                             >
-                                <FileText className="w-4 h-4 text-[#21c9a4]" />
-                                <span>{file ? 'Ganti File' : 'Pilih File dari Komputer'}</span>
+                                <FileText className="w-3.5 h-3.5 text-[#21c9a4]" />
+                                <span>{file ? 'Ganti file' : 'Pilih file dari komputer'}</span>
                             </label>
                         </div>
 
                         {errorMessage && (
-                            <div className="p-3 bg-red-50 rounded-lg border border-red-200 text-xs text-red-700 flex items-center gap-2">
-                                <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                            <div className="p-3 bg-rose-50 rounded-md border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
+                                <XCircle className="w-4 h-4 text-rose-500 flex-shrink-0" />
                                 <span>{errorMessage}</span>
                             </div>
                         )}
@@ -162,10 +162,10 @@ export default function StudentImport() {
                                 <button
                                     type="submit"
                                     disabled={isPreviewing}
-                                    className="px-5 py-2.5 bg-[#14433b] text-white text-xs font-bold rounded-lg hover:bg-[#1b554b] transition-all shadow-sm disabled:opacity-50 flex items-center gap-2"
+                                    className="px-4 py-2 bg-[#14433b] text-white text-xs font-medium rounded-md hover:bg-[#1b554b] transition-all disabled:opacity-50 flex items-center gap-2"
                                 >
-                                    <FileSpreadsheet className="w-4 h-4 text-[#21c9a4]" />
-                                    <span>{isPreviewing ? 'Memvalidasi File...' : 'Pratinjau & Validasi Data'}</span>
+                                    <FileSpreadsheet className="w-3.5 h-3.5 text-[#21c9a4]" />
+                                    <span>{isPreviewing ? 'Memvalidasi file...' : 'Pratinjau & validasi data'}</span>
                                 </button>
                             </div>
                         )}
@@ -174,30 +174,30 @@ export default function StudentImport() {
 
                 {/* Preview Results & Validation Summary */}
                 {previewResult && (
-                    <div className="space-y-5 animate-in fade-in">
+                    <div className="space-y-4">
                         {/* Summary Cards */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                            <div className="p-4 bg-white rounded-xl border border-gray-200 shadow-sm">
-                                <span className="text-xs text-gray-500 font-semibold">Total Baris Dibaca</span>
-                                <p className="text-2xl font-extrabold text-gray-900 mt-1">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="p-4 bg-white rounded-lg border border-slate-200">
+                                <span className="text-[11px] text-slate-500 font-medium">Total baris dibaca</span>
+                                <p className="text-xl font-semibold text-slate-900 mt-1">
                                     {previewResult.summary.total_rows}
                                 </p>
                             </div>
-                            <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 shadow-sm">
-                                <span className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
-                                    <CheckCircle2 className="w-3.5 h-3.5" />
-                                    <span>Baris Siap Diimpor</span>
+                            <div className="p-4 bg-white rounded-lg border border-slate-200">
+                                <span className="text-[11px] text-slate-600 font-medium flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                    <span>Baris siap diimpor</span>
                                 </span>
-                                <p className="text-2xl font-extrabold text-emerald-800 mt-1">
+                                <p className="text-xl font-semibold text-emerald-800 mt-1">
                                     {previewResult.summary.valid_count}
                                 </p>
                             </div>
-                            <div className="p-4 bg-rose-50 rounded-xl border border-rose-200 shadow-sm">
-                                <span className="text-xs text-rose-700 font-semibold flex items-center gap-1">
-                                    <XCircle className="w-3.5 h-3.5" />
-                                    <span>Baris Bermasalah / Duplikat</span>
+                            <div className="p-4 bg-white rounded-lg border border-slate-200">
+                                <span className="text-[11px] text-slate-600 font-medium flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                    <span>Baris bermasalah / duplikat</span>
                                 </span>
-                                <p className="text-2xl font-extrabold text-rose-800 mt-1">
+                                <p className="text-xl font-semibold text-rose-800 mt-1">
                                     {previewResult.summary.invalid_count}
                                 </p>
                             </div>
@@ -205,23 +205,23 @@ export default function StudentImport() {
 
                         {/* Error Warning Box if Invalid Rows exist */}
                         {previewResult.invalid_rows.length > 0 && (
-                            <div className="p-5 bg-white rounded-xl border border-rose-200 shadow-sm space-y-3">
-                                <h3 className="text-sm font-bold text-rose-900 flex items-center gap-2">
-                                    <AlertTriangle className="w-4 h-4 text-rose-600" />
-                                    <span>Daftar Kesalahan per Baris ({previewResult.invalid_rows.length} Baris Ditolak)</span>
+                            <div className="p-4 bg-white rounded-lg border border-rose-200 space-y-2.5">
+                                <h3 className="text-xs font-semibold text-rose-900 flex items-center gap-1.5">
+                                    <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                                    <span>Daftar kesalahan per baris ({previewResult.invalid_rows.length} baris ditolak)</span>
                                 </h3>
-                                <p className="text-xs text-gray-600">
-                                    Baris-baris ini akan diabaikan secara otomatis saat commit impor dilakukan:
+                                <p className="text-xs text-slate-600">
+                                    Baris-baris ini akan diabaikan secara otomatis saat penyimpanan dilakukan:
                                 </p>
-                                <div className="max-h-60 overflow-y-auto divide-y divide-rose-100 text-xs border border-rose-100 rounded-lg">
+                                <div className="max-h-56 overflow-y-auto divide-y divide-rose-100 text-xs border border-rose-100 rounded-md">
                                     {previewResult.invalid_rows.map((inv, idx) => (
-                                        <div key={idx} className="p-2.5 bg-rose-50/40 flex items-start justify-between">
+                                        <div key={idx} className="p-2 bg-rose-50/30 flex items-start justify-between">
                                             <div>
-                                                <span className="font-bold text-rose-900">Baris {inv.row_number}:</span>{' '}
-                                                <span className="font-medium text-gray-800">{inv.name || '(Nama Kosong)'}</span>{' '}
-                                                <span className="text-gray-500">(NIS: {inv.nis || '-'})</span>
+                                                <span className="font-semibold text-rose-900">Baris {inv.row_number}:</span>{' '}
+                                                <span className="text-slate-800">{inv.name || '(Nama Kosong)'}</span>{' '}
+                                                <span className="text-slate-500">(NIS: {inv.nis || '-'})</span>
                                             </div>
-                                            <div className="text-right text-rose-700 font-semibold text-[11px]">
+                                            <div className="text-right text-rose-700 font-medium text-[11px]">
                                                 {inv.errors?.join(', ')}
                                             </div>
                                         </div>
@@ -231,13 +231,13 @@ export default function StudentImport() {
                         )}
 
                         {/* Valid Rows Preview Table */}
-                        <div className="p-5 bg-white rounded-xl border border-gray-200 shadow-sm space-y-4">
+                        <div className="p-4 bg-white rounded-lg border border-slate-200 space-y-3">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h3 className="text-sm font-bold text-gray-900">
-                                        Pratinjau Data Siswa Valid ({previewResult.valid_rows.length} Siswa)
+                                    <h3 className="text-xs font-semibold text-slate-900">
+                                        Pratinjau data siswa valid ({previewResult.valid_rows.length} siswa)
                                     </h3>
-                                    <p className="text-xs text-gray-500">
+                                    <p className="text-xs text-slate-500">
                                         Data berikut siap dimasukkan ke database dan dibuatkan kartu QR otomatis
                                     </p>
                                 </div>
@@ -246,35 +246,35 @@ export default function StudentImport() {
                                     <button
                                         onClick={handleCommitImport}
                                         disabled={isCommitting}
-                                        className="px-5 py-2.5 bg-[#14433b] text-white text-xs font-bold rounded-xl hover:bg-[#1b554b] transition-all shadow-md active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                                        className="px-3.5 py-1.5 bg-[#14433b] text-white text-xs font-medium rounded-md hover:bg-[#1b554b] transition-all disabled:opacity-50 flex items-center gap-1.5"
                                     >
-                                        <CheckCircle2 className="w-4 h-4 text-[#21c9a4]" />
-                                        <span>{isCommitting ? 'Menyimpan ke Database...' : `Simpan ${previewResult.valid_rows.length} Siswa`}</span>
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-[#21c9a4]" />
+                                        <span>{isCommitting ? 'Menyimpan...' : `Simpan ${previewResult.valid_rows.length} siswa`}</span>
                                     </button>
                                 )}
                             </div>
 
-                            <div className="overflow-x-auto max-h-72">
+                            <div className="overflow-x-auto max-h-72 border border-slate-100 rounded-md">
                                 <table className="w-full text-left text-xs">
-                                    <thead className="bg-gray-50 sticky top-0 border-b border-gray-200">
+                                    <thead className="bg-slate-50 sticky top-0 border-b border-slate-200">
                                         <tr>
-                                            <th className="py-2 px-3">Baris</th>
-                                            <th className="py-2 px-3">NIS</th>
-                                            <th className="py-2 px-3">NISN</th>
-                                            <th className="py-2 px-3">Nama Lengkap</th>
-                                            <th className="py-2 px-3 text-center">L/P</th>
-                                            <th className="py-2 px-3">Kelas</th>
+                                            <th className="py-2 px-3 text-[11px] font-medium text-slate-600">Baris</th>
+                                            <th className="py-2 px-3 text-[11px] font-medium text-slate-600">NIS</th>
+                                            <th className="py-2 px-3 text-[11px] font-medium text-slate-600">NISN</th>
+                                            <th className="py-2 px-3 text-[11px] font-medium text-slate-600">Nama lengkap</th>
+                                            <th className="py-2 px-3 text-center text-[11px] font-medium text-slate-600">L/P</th>
+                                            <th className="py-2 px-3 text-[11px] font-medium text-slate-600">Kelas</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-100">
+                                    <tbody className="divide-y divide-slate-100">
                                         {previewResult.valid_rows.slice(0, 30).map((vr, idx) => (
-                                            <tr key={idx} className="hover:bg-gray-50">
-                                                <td className="py-2 px-3 text-gray-400 font-mono">{vr.row_number}</td>
-                                                <td className="py-2 px-3 font-mono font-bold text-gray-800">{vr.nis}</td>
-                                                <td className="py-2 px-3 font-mono text-gray-500">{vr.nisn || '-'}</td>
-                                                <td className="py-2 px-3 font-semibold text-gray-900">{vr.name}</td>
-                                                <td className="py-2 px-3 text-center font-bold text-gray-600">{vr.gender}</td>
-                                                <td className="py-2 px-3 font-semibold text-[#14433b]">{vr.class_name}</td>
+                                            <tr key={idx} className="hover:bg-slate-50/60">
+                                                <td className="py-2 px-3 text-slate-400 font-mono text-[11px]">{vr.row_number}</td>
+                                                <td className="py-2 px-3 font-mono font-medium text-slate-800">{vr.nis}</td>
+                                                <td className="py-2 px-3 font-mono text-slate-500">{vr.nisn || '-'}</td>
+                                                <td className="py-2 px-3 font-medium text-slate-900">{vr.name}</td>
+                                                <td className="py-2 px-3 text-center text-slate-600">{vr.gender}</td>
+                                                <td className="py-2 px-3 text-[#14433b] font-medium">{vr.class_name}</td>
                                             </tr>
                                         ))}
                                     </tbody>

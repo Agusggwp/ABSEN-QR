@@ -20,6 +20,8 @@ createInertiaApp({
         root.render(<App {...props} />);
     },
     progress: {
-        color: '#4B5563',
+        color: '#14433b',
+        delay: 300,
+        showSpinner: false,
     },
 });

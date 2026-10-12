@@ -49,6 +49,7 @@ class HandleInertiaRequests extends Middleware
             'app_settings' => [
                 'school_name' => \App\Models\SchoolSetting::get('school_name', 'SMA ARTDEVATA DENPASAR'),
                 'timezone' => \App\Models\SchoolSetting::get('timezone', 'Asia/Makassar'),
+                'logo_path' => \App\Models\SchoolSetting::get('logo_path', null),
             ],
         ];
     }

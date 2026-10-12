@@ -46,6 +46,29 @@ class AttendanceExceptionController extends Controller
         ]);
     }
 
+    public function searchStudents(Request $request)
+    {
+        $search = $request->query('q');
+        $classId = $request->query('class_id');
+
+        $query = Student::where('is_active', true)->with('schoolClass:id,name');
+
+        if ($classId) {
+            $query->where('class_id', $classId);
+        }
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('nis', 'like', "%{$search}%");
+            });
+        }
+
+        $students = $query->orderBy('name')->take(30)->get(['id', 'name', 'nis', 'class_id']);
+
+        return response()->json($students);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([

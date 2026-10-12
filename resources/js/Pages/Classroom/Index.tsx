@@ -48,7 +48,7 @@ export default function ClassroomConfirmationIndex({
     const [isSaving, setIsSaving] = useState(false);
 
     const handleClassChange = (newClassId: number) => {
-        router.get('/classroom', { class_id: newClassId }, { preserveState: false });
+        router.get('/classroom', { class_id: newClassId }, { preserveState: false, preserveScroll: true, showProgress: false });
     };
 
     const handleStatusChange = (studentId: number, status: 'present_in_class' | 'absent_in_class' | 'with_excuse') => {
@@ -122,7 +122,7 @@ export default function ClassroomConfirmationIndex({
                         <select
                             value={selected_class_id}
                             onChange={(e) => handleClassChange(Number(e.target.value))}
-                            className="px-3 py-1.5 text-xs font-bold rounded-lg border-gray-300 bg-gray-50 text-[#14433b] focus:ring-[#21c9a4] focus:border-[#21c9a4]"
+                            className="pl-3 pr-8 py-1.5 text-xs font-bold rounded-lg border-gray-300 bg-white text-[#14433b] focus:ring-[#21c9a4] focus:border-[#21c9a4]"
                         >
                             {classes.map((cls) => (
                                 <option key={cls.id} value={cls.id}>
